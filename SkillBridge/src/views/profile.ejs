@@ -1,0 +1,94 @@
+<%- include("partials/head", { title: "Profile" }) %>
+
+<main class="page-shell narrow">
+  <section class="topbar">
+    <div>
+      <p class="eyebrow">Profile</p>
+      <h1>Your SkillBridge details</h1>
+      <p class="subtle">View and edit the information saved for your account.</p>
+    </div>
+    <div class="page-actions">
+      <a class="ghost-btn" href="/home">Back to home</a>
+      <a class="ghost-btn" href="/logout">Logout</a>
+    </div>
+  </section>
+
+  <section class="card">
+    <% if (error) { %>
+      <div class="alert"><%= error %></div>
+    <% } %>
+
+    <% if (success) { %>
+      <div class="alert success-alert"><%= success %></div>
+    <% } %>
+
+    <form class="app-form" action="/profile" method="POST">
+      <div class="grid two">
+        <label>
+          Full name
+          <input type="text" name="fullName" value="<%= formData.fullName %>" required />
+        </label>
+        <label>
+          Email
+          <input type="email" name="email" value="<%= formData.email %>" required />
+        </label>
+      </div>
+
+      <div class="grid two">
+        <label>
+          Phone number
+          <input type="tel" name="phone" value="<%= formData.phone %>" required />
+        </label>
+        <label>
+          Experience (years)
+          <input type="number" min="0" max="30" name="experienceYears" value="<%= formData.experienceYears %>" required />
+        </label>
+      </div>
+
+      <div class="grid two">
+        <label>
+          Education
+          <input type="text" name="education" value="<%= formData.education %>" required />
+        </label>
+        <label>
+          Location
+          <input type="text" name="location" value="<%= formData.location %>" required />
+        </label>
+      </div>
+
+      <label>
+        Career goal
+        <select name="goal" required>
+          <% goals.forEach((goal) => { %>
+            <option value="<%= goal %>" <%= formData.goal === goal ? 'selected' : '' %>><%= goal %></option>
+          <% }); %>
+        </select>
+      </label>
+
+      <label>
+        Resume skills
+        <input type="text" name="resumeSkills" value="<%= formData.resumeSkills %>" required />
+      </label>
+
+      <label>
+        Resume text
+        <textarea name="resumeText" rows="10" required><%= formData.resumeText %></textarea>
+      </label>
+
+      <div class="profile-meta">
+        <div>
+          <span class="meta-label">Account created</span>
+          <strong><%= user.created_at %></strong>
+        </div>
+        <div>
+          <span class="meta-label">Stored resume file</span>
+          <strong><%= user.resume_filename %></strong>
+        </div>
+      </div>
+
+      <button class="primary-btn" type="submit">Save changes</button>
+    </form>
+  </section>
+</main>
+
+<%- include("partials/foot") %>

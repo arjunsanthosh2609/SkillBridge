@@ -1,0 +1,101 @@
+<%- include("partials/head", { title: "Sign Up" }) %>
+
+<main class="auth-shell">
+  <section class="hero-panel">
+    <p class="eyebrow">SkillBridge</p>
+    <h1>AI resume screener and skill gap analyser</h1>
+    <p class="hero-copy">
+      Upload your resume, extract your current skills, measure your level with a goal-based exam,
+      and unlock a personalized roadmap.
+    </p>
+    <div class="hero-points">
+      <span>Resume NLP extraction</span>
+      <span>Goal-aware skill assessment</span>
+      <span>Dynamic trend insights</span>
+    </div>
+  </section>
+
+  <section class="form-panel">
+    <div class="panel-header">
+      <h2>Create your account</h2>
+      <p>Fill in the required details and upload your latest resume.</p>
+    </div>
+
+    <% if (error) { %>
+      <div class="alert"><%= error %></div>
+    <% } %>
+
+    <form class="app-form" action="/signup" method="POST" enctype="multipart/form-data">
+      <div class="grid two">
+        <label>
+          Full name
+          <input type="text" name="fullName" value="<%= formData.fullName || '' %>" required />
+        </label>
+        <label>
+          Email
+          <input type="email" name="email" value="<%= formData.email || '' %>" required />
+        </label>
+      </div>
+
+      <div class="grid two">
+        <label>
+          Phone number
+          <input type="tel" name="phone" value="<%= formData.phone || '' %>" required />
+        </label>
+        <label>
+          Password
+          <input type="password" name="password" required />
+        </label>
+      </div>
+
+      <div class="grid two">
+        <label>
+          Confirm password
+          <input type="password" name="confirmPassword" required />
+        </label>
+        <div class="empty-slot" aria-hidden="true"></div>
+      </div>
+
+      <div class="grid two">
+        <label>
+          Education
+          <input type="text" name="education" value="<%= formData.education || '' %>" placeholder="B.Tech CSE" required />
+        </label>
+        <label>
+          Location
+          <input type="text" name="location" value="<%= formData.location || '' %>" required />
+        </label>
+      </div>
+
+      <div class="grid two">
+        <label>
+          Experience (years)
+          <input type="number" min="0" max="30" name="experienceYears" value="<%= formData.experienceYears || '' %>" required />
+        </label>
+        <label>
+          Career goal
+          <select name="goal" required>
+            <option value="">Select your goal</option>
+            <% goals.forEach((goal) => { %>
+              <option value="<%= goal %>" <%= formData.goal === goal ? 'selected' : '' %>><%= goal %></option>
+            <% }); %>
+          </select>
+        </label>
+      </div>
+
+      <label>
+        Resume document
+        <input type="file" name="resume" accept=".pdf,.docx,.txt" required />
+      </label>
+
+      <button class="primary-btn" type="submit">Create account and analyse resume</button>
+    </form>
+
+    <p class="auth-switch">
+      Already have an account?
+      <a href="/login">Login here</a>
+    </p>
+  </section>
+</main>
+
+<%- include("partials/foot") %>

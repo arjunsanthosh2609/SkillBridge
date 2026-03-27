@@ -1,0 +1,48 @@
+<%- include("partials/head", { title: "Login" }) %>
+
+<main class="auth-shell auth-shell-compact">
+  <section class="hero-panel">
+    <p class="eyebrow">SkillBridge</p>
+    <h1>Welcome back</h1>
+    <p class="hero-copy">
+      Sign in to continue your resume screening, take your skill exam, and unlock your personalized roadmap.
+    </p>
+    <div class="hero-points">
+      <span>Secure login</span>
+      <span>Resume-based insights</span>
+      <span>Roadmap tracking</span>
+    </div>
+  </section>
+
+  <section class="form-panel">
+    <div class="panel-header">
+      <h2>Login to your account</h2>
+      <p>Use the email and password you created during signup.</p>
+    </div>
+
+    <% if (error) { %>
+      <div class="alert"><%= error %></div>
+    <% } %>
+
+    <form class="app-form" action="/login" method="POST">
+      <label>
+        Email
+        <input type="email" name="email" value="<%= formData.email || '' %>" required />
+      </label>
+
+      <label>
+        Password
+        <input type="password" name="password" required />
+      </label>
+
+      <button class="primary-btn" type="submit">Login</button>
+    </form>
+
+    <p class="auth-switch">
+      New to SkillBridge?
+      <a href="/signup">Create an account</a>
+    </p>
+  </section>
+</main>
+
+<%- include("partials/foot") %>

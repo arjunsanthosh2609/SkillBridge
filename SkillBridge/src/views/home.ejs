@@ -1,0 +1,85 @@
+<%- include("partials/head", { title: "Home" }) %>
+
+<main class="page-shell">
+  <section class="topbar">
+    <div>
+      <p class="eyebrow">Welcome back</p>
+      <h1><%= user.full_name %></h1>
+      <p class="subtle">Goal: <strong><%= user.goal %></strong></p>
+    </div>
+    <div class="topbar-actions">
+      <a class="profile-link" href="/profile" aria-label="Open profile">
+        <span class="profile-avatar"><%= (user.full_name || "U").charAt(0).toUpperCase() %></span>
+        <span class="profile-link-text">Profile</span>
+      </a>
+      <a class="ghost-btn" href="/logout">Logout</a>
+      <div class="status-pill">
+        <span>Exam status</span>
+        <strong><%= examResult ? `${examResult.level} (${examResult.score}%)` : "Not completed" %></strong>
+      </div>
+    </div>
+  </section>
+
+  <section class="dashboard-grid">
+    <article class="card">
+      <div class="card-heading">
+        <h2>Resume skill snapshot</h2>
+        <p>Extracted from your uploaded resume.</p>
+      </div>
+      <div class="chip-row">
+        <% if (resumeSkills.length) { %>
+          <% resumeSkills.forEach((skill) => { %>
+            <span class="chip"><%= skill %></span>
+          <% }); %>
+        <% } else { %>
+          <p class="subtle">No recognizable skills were extracted from the uploaded resume.</p>
+        <% } %>
+      </div>
+    </article>
+
+    <article class="card accent-card">
+      <div class="card-heading">
+        <h2>Skill level exam</h2>
+        <p>Take a goal-based test to verify how well your resume matches your real working knowledge.</p>
+      </div>
+      <a class="primary-btn" href="/exam"><%= examResult ? "Retake exam" : "Start exam" %></a>
+    </article>
+
+    <article class="card">
+      <div class="card-heading">
+        <h2>Future trending skills</h2>
+        <p>Generated through the LLM layer to stay adaptable as hiring trends change.</p>
+      </div>
+      <div class="trend-list">
+        <% trendingSkills.forEach((item) => { %>
+          <div class="trend-item">
+            <h3><%= item.name %></h3>
+            <p><%= item.reason %></p>
+          </div>
+        <% }); %>
+      </div>
+    </article>
+
+    <article class="card roadmap-card">
+      <div class="card-heading">
+        <h2>Personal roadmap</h2>
+        <p>The roadmap uses your goal, resume skills, and exam result to suggest what to learn next.</p>
+      </div>
+
+      <% if (examResult) { %>
+        <% if (hasRoadmap) { %>
+          <div class="action-row">
+            <a class="primary-btn" href="/roadmap">Regenerate roadmap</a>
+            <a class="ghost-btn" href="/roadmap/progress">Track progress</a>
+          </div>
+        <% } else { %>
+          <a class="primary-btn" href="/roadmap">Generate roadmap</a>
+        <% } %>
+      <% } else { %>
+        <button class="primary-btn locked-btn" type="button" disabled>Complete exam to unlock roadmap</button>
+      <% } %>
+    </article>
+  </section>
+</main>
+
+<%- include("partials/foot") %>

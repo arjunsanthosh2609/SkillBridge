@@ -1,0 +1,68 @@
+<%- include("partials/head", { title: "Roadmap" }) %>
+
+<main class="page-shell">
+  <section class="topbar">
+    <div>
+      <p class="eyebrow">Roadmap</p>
+      <h1><%= roadmap.headline %></h1>
+      <p class="subtle"><%= roadmap.summary %></p>
+    </div>
+    <div class="status-pill">
+      <span><%= isSavedRoadmap ? "View mode" : "Generated now" %></span>
+      <% if (examResult) { %>
+        <strong><%= examResult.level %> - <%= examResult.score %>%</strong>
+      <% } else { %>
+        <strong>Saved roadmap</strong>
+      <% } %>
+    </div>
+  </section>
+
+  <section class="page-actions">
+    <a class="ghost-btn" href="/home">Back to home</a>
+    <a class="ghost-btn" href="/logout">Logout</a>
+    <% if (isSavedRoadmap) { %>
+      <a class="primary-btn" href="/roadmap">Regenerate roadmap</a>
+    <% } else { %>
+      <a class="ghost-btn" href="/roadmap/progress">Track progress</a>
+    <% } %>
+  </section>
+
+  <section class="dashboard-grid single">
+    <% roadmap.phases.forEach((phase) => { %>
+      <article class="card roadmap-phase">
+        <div class="card-heading">
+          <h2><%= phase.title %></h2>
+          <p><%= phase.duration %></p>
+        </div>
+        <ul class="phase-list">
+          <% phase.actions.forEach((action) => { %>
+            <li><%= action %></li>
+          <% }); %>
+        </ul>
+
+        <% if (phase.resources && phase.resources.length) { %>
+          <div class="resource-block">
+            <h3>Study materials</h3>
+            <div class="resource-list">
+              <% phase.resources.forEach((resource) => { %>
+                <a class="resource-item" href="<%= resource.url %>" target="_blank" rel="noreferrer">
+                  <span class="resource-type"><%= resource.type %></span>
+                  <strong><%= resource.title %></strong>
+                  <span class="resource-provider"><%= resource.provider %></span>
+                  <% if (resource.focus) { %>
+                    <span class="resource-focus"><%= resource.focus %></span>
+                  <% } %>
+                  <% if (resource.why) { %>
+                    <span class="resource-why"><%= resource.why %></span>
+                  <% } %>
+                </a>
+              <% }); %>
+            </div>
+          </div>
+        <% } %>
+      </article>
+    <% }); %>
+  </section>
+</main>
+
+<%- include("partials/foot") %>

@@ -1,0 +1,4 @@
+Arjun Kumar
+Frontend Developer
+Skills: HTML, CSS, JavaScript, React, Node.js, Express, Git, REST API, problem solving, communication.
+Built responsive web apps and integrated APIs for dashboard and user management workflows.

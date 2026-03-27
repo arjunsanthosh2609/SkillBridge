@@ -1,0 +1,41 @@
+<%- include("partials/head", { title: "Exam" }) %>
+
+<main class="page-shell narrow">
+  <section class="topbar">
+    <div>
+      <p class="eyebrow">Assessment</p>
+      <h1><%= user.goal %> skill exam</h1>
+      <p class="subtle">Questions are tailored around your goal and your resume skills.</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="chip-row">
+      <% resumeSkills.forEach((skill) => { %>
+        <span class="chip"><%= skill %></span>
+      <% }); %>
+    </div>
+
+    <% if (error) { %>
+      <div class="alert"><%= error %></div>
+    <% } %>
+
+    <form class="exam-form" action="/exam" method="POST">
+      <% questions.forEach((question, index) => { %>
+        <fieldset class="question-block">
+          <legend><%= index + 1 %>. <%= question.question %></legend>
+          <% question.options.forEach((option, optionIndex) => { %>
+            <label class="option">
+              <input type="radio" name="question_<%= index %>" value="<%= optionIndex %>" required />
+              <span><%= option %></span>
+            </label>
+          <% }); %>
+        </fieldset>
+      <% }); %>
+
+      <button class="primary-btn" type="submit">Submit exam</button>
+    </form>
+  </section>
+</main>
+
+<%- include("partials/foot") %>
