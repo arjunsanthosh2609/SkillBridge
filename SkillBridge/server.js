@@ -25,6 +25,7 @@ const {
 } = require("./src/db");
 const { extractResumeData } = require("./src/services/resumeParser");
 const { getTrendingSkills, generateExam, generateRoadmap } = require("./src/services/llmService");
+const { initializeKnowledgeBase, retrieveKnowledgeContext } = require("./src/services/knowledgeBase");
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -38,6 +39,9 @@ if (!fs.existsSync(uploadDir)) {
 
 initDb();
 deleteExpiredRememberTokens().catch(() => {});
+initializeKnowledgeBase().catch((error) => {
+  console.error("Knowledge base initialization failed:", error.message);
+});
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "src", "views"));
@@ -112,6 +116,32 @@ function formatExamAttempt(row) {
     level: row.level,
     answers: JSON.parse(row.answers_json || "[]")
   };
+}
+
+function normalizeResumeSkills(rawSkills) {
+  if (!Array.isArray(rawSkills)) {
+    return [];
+  }
+
+  return rawSkills
+    .map((skill) => {
+      if (typeof skill === "string") {
+        return skill.trim();
+      }
+
+      if (skill && typeof skill === "object") {
+        if (typeof skill.skill === "string" && skill.skill.trim()) {
+          return skill.skill.trim();
+        }
+
+        if (typeof skill.matched === "string" && skill.matched.trim()) {
+          return skill.matched.trim();
+        }
+      }
+
+      return "";
+    })
+    .filter(Boolean);
 }
 
 function getCookieValue(req, name) {
@@ -214,6 +244,7 @@ app.post("/signup", upload.single("resume"), async (req, res) => {
 
     const passwordHash = await bcrypt.hash(req.body.password, 10);
     const resumeData = await extractResumeData(req.file.path, req.file.originalname);
+    const normalizedResumeSkills = normalizeResumeSkills(resumeData.skills);
 
     const newUser = await createUser({
       fullName: req.body.fullName.trim(),
@@ -226,11 +257,11 @@ app.post("/signup", upload.single("resume"), async (req, res) => {
       goal: req.body.goal.trim(),
       resumeFilename: req.file.filename,
       resumeText: resumeData.resumeText,
-      resumeSkills: JSON.stringify(resumeData.skills)
+      resumeSkills: JSON.stringify(normalizedResumeSkills)
     });
 
     req.session.userId = newUser.id;
-    req.session.resumeSkills = resumeData.skills;
+    req.session.resumeSkills = normalizedResumeSkills;
     await issueRememberMeToken(res, newUser.id);
 
     return res.redirect("/home");
@@ -267,7 +298,7 @@ app.post("/login", async (req, res) => {
     }
 
     req.session.userId = user.id;
-    req.session.resumeSkills = JSON.parse(user.resume_skills || "[]");
+    req.session.resumeSkills = normalizeResumeSkills(JSON.parse(user.resume_skills || "[]"));
     await issueRememberMeToken(res, user.id);
 
     return res.redirect("/home");
@@ -281,7 +312,7 @@ app.post("/login", async (req, res) => {
 
 app.get("/home", requireAuth, async (req, res) => {
   const user = await getUserById(req.session.userId);
-  const resumeSkills = JSON.parse(user.resume_skills || "[]");
+  const resumeSkills = normalizeResumeSkills(JSON.parse(user.resume_skills || "[]"));
   const trendingSkills = await getTrendingSkills({ goal: user.goal, skills: resumeSkills });
   const latestExamAttempt = await getLatestExamAttemptByUserId(req.session.userId);
   const latestRoadmap = await getLatestRoadmapByUserId(req.session.userId);
@@ -324,7 +355,7 @@ app.get("/profile", requireAuth, async (req, res) => {
       experienceYears: user.experience_years,
       goal: user.goal,
       resumeText: user.resume_text,
-      resumeSkills: JSON.parse(user.resume_skills || "[]").join(", ")
+      resumeSkills: normalizeResumeSkills(JSON.parse(user.resume_skills || "[]")).join(", ")
     }
   });
 });
@@ -391,7 +422,7 @@ app.post("/profile", requireAuth, async (req, res) => {
         experienceYears: user.experience_years,
         goal: user.goal,
         resumeText: user.resume_text,
-        resumeSkills: JSON.parse(user.resume_skills || "[]").join(", ")
+        resumeSkills: normalizeResumeSkills(JSON.parse(user.resume_skills || "[]")).join(", ")
       }
     });
   } catch (error) {
@@ -407,7 +438,7 @@ app.post("/profile", requireAuth, async (req, res) => {
 
 app.get("/exam", requireAuth, async (req, res) => {
   const user = await getUserById(req.session.userId);
-  const resumeSkills = JSON.parse(user.resume_skills || "[]");
+  const resumeSkills = normalizeResumeSkills(JSON.parse(user.resume_skills || "[]"));
   const examQuestions = await generateExam({ goal: user.goal, skills: resumeSkills });
   req.session.examQuestions = examQuestions;
 
@@ -422,7 +453,7 @@ app.get("/exam", requireAuth, async (req, res) => {
 app.post("/exam", requireAuth, async (req, res) => {
   const questions = req.session.examQuestions || [];
   const user = await getUserById(req.session.userId);
-  const resumeSkills = JSON.parse(user.resume_skills || "[]");
+  const resumeSkills = normalizeResumeSkills(JSON.parse(user.resume_skills || "[]"));
 
   if (!questions.length) {
     return res.redirect("/exam");
@@ -467,19 +498,28 @@ app.get("/roadmap", requireAuth, async (req, res) => {
   }
 
   const user = await getUserById(req.session.userId);
-  const resumeSkills = JSON.parse(user.resume_skills || "[]");
+  const resumeSkills = normalizeResumeSkills(JSON.parse(user.resume_skills || "[]"));
   const roadmap = await generateRoadmap({
     goal: user.goal,
     skills: resumeSkills,
     skillLevel: examResult.level,
-    score: examResult.score
+    score: examResult.score,
+    knowledgeContext: await retrieveKnowledgeContext({
+      goal: user.goal,
+      skills: resumeSkills
+    })
   });
 
   await saveRoadmap({
     userId: req.session.userId,
     headline: roadmap.headline,
     summary: roadmap.summary,
-    phasesJson: JSON.stringify(roadmap.phases || [])
+    phasesJson: JSON.stringify(roadmap.phases || []),
+    contextJson: JSON.stringify({
+      jobSignals: roadmap.jobSignals || [],
+      datasetSuggestions: roadmap.datasetSuggestions || [],
+      knowledgeBase: roadmap.knowledgeBase || {}
+    })
   });
 
   res.render("roadmap", {
@@ -493,7 +533,7 @@ app.get("/roadmap", requireAuth, async (req, res) => {
 
 app.get("/roadmap/progress", requireAuth, async (req, res) => {
   const user = await getUserById(req.session.userId);
-  const resumeSkills = JSON.parse(user.resume_skills || "[]");
+  const resumeSkills = normalizeResumeSkills(JSON.parse(user.resume_skills || "[]"));
   const latestExamAttempt = await getLatestExamAttemptByUserId(req.session.userId);
   const latestRoadmap = await getLatestRoadmapByUserId(req.session.userId);
 
@@ -508,7 +548,8 @@ app.get("/roadmap/progress", requireAuth, async (req, res) => {
     roadmap: {
       headline: latestRoadmap.headline,
       summary: latestRoadmap.summary,
-      phases: JSON.parse(latestRoadmap.phases_json || "[]")
+      phases: JSON.parse(latestRoadmap.phases_json || "[]"),
+      ...(JSON.parse(latestRoadmap.context_json || "{}"))
     },
     isSavedRoadmap: true
   });

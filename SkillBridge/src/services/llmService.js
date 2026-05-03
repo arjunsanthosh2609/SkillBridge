@@ -44,6 +44,22 @@ async function requestJsonFromModel(prompt, fallbackData) {
   }
 }
 
+function normalizeKnowledgeItems(items) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  return items.map((item) => ({
+    title: String(item.title || "").trim(),
+    provider: String(item.provider || "").trim(),
+    sourceUrl: String(item.sourceUrl || item.url || "").trim(),
+    roleTarget: String(item.roleTarget || "").trim(),
+    summary: String(item.summary || "").trim(),
+    skills: normalizeSkills(item.skills || []),
+    tags: normalizeSkills(item.tags || [])
+  })).filter((item) => item.title && item.sourceUrl);
+}
+
 const RESOURCE_LIBRARY = {
   frontend: [
     {
@@ -354,15 +370,35 @@ The "focus" should be a short phrase like "React foundations" or "API practice".
   return result.phaseResources || fallback;
 }
 
-async function attachStudyMaterials(roadmap, goal, skills, skillLevel, score) {
+async function attachStudyMaterials(roadmap, goal, skills, skillLevel, score, knowledgeContext) {
   const phases = roadmap.phases || [];
-  const personalized = await personalizeStudyMaterials({
-    phases,
-    goal,
-    skills,
-    skillLevel,
-    score
-  });
+  const learningResources = normalizeKnowledgeItems(knowledgeContext.learningResources);
+  const sourceCatalog = learningResources.length ? learningResources.map((resource) => ({
+    title: resource.title,
+    provider: resource.provider,
+    type: "Learning Resource",
+    url: resource.sourceUrl,
+    summary: resource.summary,
+    skills: resource.skills,
+    tags: resource.tags
+  })) : null;
+
+  const personalized = sourceCatalog && sourceCatalog.length
+    ? await personalizeRetrievedResources({
+      phases,
+      goal,
+      skills,
+      skillLevel,
+      score,
+      resources: sourceCatalog
+    })
+    : await personalizeStudyMaterials({
+      phases,
+      goal,
+      skills,
+      skillLevel,
+      score
+    });
 
   const personalizedMap = new Map(personalized.map((entry) => [entry.phaseIndex, entry.resources]));
   const mergedPhases = phases.map((phase, index) => ({
@@ -374,6 +410,71 @@ async function attachStudyMaterials(roadmap, goal, skills, skillLevel, score) {
     ...roadmap,
     phases: mergedPhases
   };
+}
+
+function buildFallbackRetrievedResources({ phases, resources, goal, skills, skillLevel }) {
+  return phases.map((phase, index) => {
+    const start = (index * 2) % resources.length;
+    const picks = [resources[start], resources[(start + 1) % resources.length]].filter(Boolean);
+
+    return {
+      phaseIndex: index,
+      resources: picks.map((resource) => ({
+        title: resource.title,
+        provider: resource.provider,
+        type: resource.type,
+        url: resource.url,
+        focus: skillLevel === "Beginner" ? "Close foundations gap" : "Build applied depth",
+        why: `Chosen for ${goal} because it reinforces ${skills.slice(0, 3).join(", ") || "your current profile"} and fits the phase goal.`,
+        summary: resource.summary || ""
+      }))
+    };
+  });
+}
+
+async function personalizeRetrievedResources({ phases, goal, skills, skillLevel, score, resources }) {
+  const fallback = buildFallbackRetrievedResources({
+    phases,
+    resources,
+    goal,
+    skills,
+    skillLevel
+  });
+
+  if (!client) {
+    return fallback;
+  }
+
+  const prompt = `
+You are selecting personalized learning resources from a retrieved RAG context.
+Return JSON with a "phaseResources" array.
+Each item must contain:
+- "phaseIndex" as an integer
+- "resources" as an array of exactly 2 objects
+Each resource object must contain:
+- "title"
+- "provider"
+- "type"
+- "url"
+- "why"
+- "focus"
+- "summary"
+
+Only choose from this retrieved catalog and preserve URLs exactly:
+${JSON.stringify(resources, null, 2)}
+
+Learner goal: ${goal}
+Learner resume skills: ${skills.join(", ")}
+Assessment level: ${skillLevel}
+Assessment score: ${score}
+Roadmap phases:
+${JSON.stringify(phases, null, 2)}
+
+Personalize based on the learner's likely gaps and each phase outcome.
+`;
+
+  const result = await requestJsonFromModel(prompt, { phaseResources: fallback });
+  return result.phaseResources || fallback;
 }
 
 function buildFallbackTrends(goal, skills) {
@@ -516,6 +617,20 @@ function buildFallbackRoadmap({ goal, skills, skillLevel, score }) {
   };
 }
 
+function buildFallbackKnowledgeContext(knowledgeContext) {
+  const normalized = {
+    jobRequirements: normalizeKnowledgeItems(knowledgeContext.jobRequirements),
+    learningResources: normalizeKnowledgeItems(knowledgeContext.learningResources),
+    datasets: normalizeKnowledgeItems(knowledgeContext.datasets)
+  };
+
+  return {
+    jobRequirements: normalized.jobRequirements.slice(0, 3),
+    learningResources: normalized.learningResources.slice(0, 6),
+    datasets: normalized.datasets.slice(0, 3)
+  };
+}
+
 async function getTrendingSkills({ goal, skills }) {
   const normalizedSkills = normalizeSkills(skills);
   const fallback = buildFallbackTrends(goal, normalizedSkills);
@@ -547,9 +662,10 @@ Make the exam test whether the learner truly understands the resume skills and r
   return result.questions || fallback;
 }
 
-async function generateRoadmap({ goal, skills, skillLevel, score }) {
+async function generateRoadmap({ goal, skills, skillLevel, score, knowledgeContext = {} }) {
   const normalizedSkills = normalizeSkills(skills);
   const fallback = buildFallbackRoadmap({ goal, skills: normalizedSkills, skillLevel, score });
+  const fallbackContext = buildFallbackKnowledgeContext(knowledgeContext);
   const prompt = `
 Return JSON with:
 - "headline"
@@ -559,14 +675,30 @@ Each phase object must contain:
 - "title"
 - "duration"
 - "actions" array with 3 strings
+- "objective" string
+Also return:
+- "jobSignals" array of up to 3 objects with "title", "provider", "summary", "sourceUrl"
+- "datasetSuggestions" array of up to 3 objects with "title", "provider", "summary", "sourceUrl"
 Generate a personalized roadmap for this learner.
 Goal: ${goal}
 Resume skills: ${normalizedSkills.join(", ")}
 Assessment level: ${skillLevel}
 Assessment score: ${score}
+Retrieved job requirements:
+${JSON.stringify(fallbackContext.jobRequirements, null, 2)}
+Retrieved learning resources:
+${JSON.stringify(fallbackContext.learningResources, null, 2)}
+Retrieved datasets:
+${JSON.stringify(fallbackContext.datasets, null, 2)}
 `;
   const roadmap = await requestJsonFromModel(prompt, fallback);
-  return attachStudyMaterials(roadmap, goal, normalizedSkills, skillLevel, score);
+  const enrichedRoadmap = await attachStudyMaterials(roadmap, goal, normalizedSkills, skillLevel, score, fallbackContext);
+  return {
+    ...enrichedRoadmap,
+    jobSignals: Array.isArray(roadmap.jobSignals) && roadmap.jobSignals.length ? roadmap.jobSignals : fallbackContext.jobRequirements,
+    datasetSuggestions: Array.isArray(roadmap.datasetSuggestions) && roadmap.datasetSuggestions.length ? roadmap.datasetSuggestions : fallbackContext.datasets,
+    knowledgeBase: fallbackContext
+  };
 }
 
 module.exports = {

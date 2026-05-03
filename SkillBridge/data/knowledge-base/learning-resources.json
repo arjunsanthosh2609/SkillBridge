@@ -1,0 +1,90 @@
+[
+  {
+    "docType": "learning_resource",
+    "provider": "freeCodeCamp",
+    "title": "Learn JavaScript Algorithms and Data Structures",
+    "sourceUrl": "https://www.freecodecamp.org/learn/javascript-algorithms-and-data-structures-v8/",
+    "roleTarget": "frontend",
+    "summary": "Project-based JavaScript curriculum covering core syntax, DOM logic, debugging, functional thinking, and algorithmic problem solving.",
+    "skills": ["javascript", "problem solving", "algorithms", "debugging"],
+    "tags": ["frontend", "foundations", "interactive"],
+    "metadata": { "sourceType": "curriculum" }
+  },
+  {
+    "docType": "learning_resource",
+    "provider": "roadmap.sh",
+    "title": "Frontend Developer Roadmap",
+    "sourceUrl": "https://roadmap.sh/frontend",
+    "roleTarget": "frontend",
+    "summary": "Visual roadmap of browser fundamentals, HTML, CSS, JavaScript, frameworks, performance, and frontend tooling expectations.",
+    "skills": ["html", "css", "javascript", "react", "performance"],
+    "tags": ["frontend", "roadmap", "career"],
+    "metadata": { "sourceType": "roadmap" }
+  },
+  {
+    "docType": "learning_resource",
+    "provider": "MDN",
+    "title": "Learn Web Development",
+    "sourceUrl": "https://developer.mozilla.org/en-US/docs/Learn_web_development",
+    "roleTarget": "frontend",
+    "summary": "Structured documentation for HTML, CSS, JavaScript, forms, accessibility, testing, performance, and web architecture.",
+    "skills": ["html", "css", "javascript", "accessibility", "testing"],
+    "tags": ["frontend", "documentation", "web"],
+    "metadata": { "sourceType": "docs" }
+  },
+  {
+    "docType": "learning_resource",
+    "provider": "GeeksforGeeks",
+    "title": "Data Structures Tutorial",
+    "sourceUrl": "https://www.geeksforgeeks.org/data-structures/",
+    "roleTarget": "backend",
+    "summary": "Reference material for arrays, stacks, queues, trees, graphs, complexity, and interview-focused data structure practice.",
+    "skills": ["data structures", "algorithms", "problem solving"],
+    "tags": ["backend", "interview", "foundations"],
+    "metadata": { "sourceType": "tutorial" }
+  },
+  {
+    "docType": "learning_resource",
+    "provider": "W3Schools",
+    "title": "SQL Tutorial",
+    "sourceUrl": "https://www.w3schools.com/sql/",
+    "roleTarget": "backend",
+    "summary": "Hands-on SQL reference with examples for joins, grouping, filtering, and CRUD operations used in application development.",
+    "skills": ["sql", "databases", "queries"],
+    "tags": ["backend", "database", "practice"],
+    "metadata": { "sourceType": "tutorial" }
+  },
+  {
+    "docType": "learning_resource",
+    "provider": "Coursera",
+    "title": "IBM Data Science Professional Certificate",
+    "sourceUrl": "https://www.coursera.org/professional-certificates/ibm-data-science",
+    "roleTarget": "data-scientist",
+    "summary": "Course description covering Python, SQL, data analysis, visualization, machine learning, and portfolio project work.",
+    "skills": ["python", "sql", "data analysis", "machine learning"],
+    "tags": ["data-science", "certificate", "portfolio"],
+    "metadata": { "sourceType": "course-description" }
+  },
+  {
+    "docType": "learning_resource",
+    "provider": "YouTube",
+    "title": "freeCodeCamp Python for Data Analysis Playlist Search",
+    "sourceUrl": "https://www.youtube.com/results?search_query=freecodecamp+python+data+analysis+playlist",
+    "roleTarget": "data-analyst",
+    "summary": "Search entry point for long-form Python and pandas playlists useful for analyst workflows and notebook-based practice.",
+    "skills": ["python", "pandas", "data analysis"],
+    "tags": ["video", "playlist", "analyst"],
+    "metadata": { "sourceType": "playlist-search" }
+  },
+  {
+    "docType": "learning_resource",
+    "provider": "roadmap.sh",
+    "title": "Backend Developer Roadmap",
+    "sourceUrl": "https://roadmap.sh/backend",
+    "roleTarget": "backend",
+    "summary": "Backend roadmap spanning networking, APIs, databases, caching, security, scaling, and deployment topics.",
+    "skills": ["apis", "sql", "security", "docker", "system design"],
+    "tags": ["backend", "roadmap", "architecture"],
+    "metadata": { "sourceType": "roadmap" }
+  }
+]

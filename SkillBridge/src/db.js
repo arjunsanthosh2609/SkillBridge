@@ -28,6 +28,18 @@ function get(sql, params = []) {
   });
 }
 
+function all(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.all(sql, params, (error, rows) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve(rows);
+    });
+  });
+}
+
 function initDb() {
   db.serialize(() => {
     db.run(`
@@ -67,6 +79,7 @@ function initDb() {
         headline TEXT NOT NULL,
         summary TEXT NOT NULL,
         phases_json TEXT NOT NULL,
+        context_json TEXT DEFAULT '{}',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(user_id) REFERENCES users(id)
       )
@@ -82,7 +95,31 @@ function initDb() {
         FOREIGN KEY(user_id) REFERENCES users(id)
       )
     `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS knowledge_documents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        doc_type TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        title TEXT NOT NULL,
+        source_url TEXT NOT NULL,
+        role_target TEXT,
+        summary TEXT NOT NULL,
+        skills_json TEXT NOT NULL,
+        tags_json TEXT NOT NULL,
+        metadata_json TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    db.run("CREATE INDEX IF NOT EXISTS idx_kb_doc_type ON knowledge_documents(doc_type)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_kb_provider ON knowledge_documents(provider)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_kb_role_target ON knowledge_documents(role_target)");
+    db.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_kb_source_url ON knowledge_documents(source_url)");
   });
+
+  db.run("ALTER TABLE roadmaps ADD COLUMN context_json TEXT DEFAULT '{}'", () => {});
 }
 
 async function createUser(user) {
@@ -174,10 +211,10 @@ function getLatestExamAttemptByUserId(userId) {
   );
 }
 
-function saveRoadmap({ userId, headline, summary, phasesJson }) {
+function saveRoadmap({ userId, headline, summary, phasesJson, contextJson = "{}" }) {
   return run(
-    "INSERT INTO roadmaps (user_id, headline, summary, phases_json) VALUES (?, ?, ?, ?)",
-    [userId, headline, summary, phasesJson]
+    "INSERT INTO roadmaps (user_id, headline, summary, phases_json, context_json) VALUES (?, ?, ?, ?, ?)",
+    [userId, headline, summary, phasesJson, contextJson]
   );
 }
 
@@ -186,6 +223,55 @@ function getLatestRoadmapByUserId(userId) {
     "SELECT * FROM roadmaps WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 1",
     [userId]
   );
+}
+
+function upsertKnowledgeDocument(document) {
+  return run(
+    `
+      INSERT INTO knowledge_documents (
+        doc_type,
+        provider,
+        title,
+        source_url,
+        role_target,
+        summary,
+        skills_json,
+        tags_json,
+        metadata_json,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(source_url) DO UPDATE SET
+        doc_type = excluded.doc_type,
+        provider = excluded.provider,
+        title = excluded.title,
+        role_target = excluded.role_target,
+        summary = excluded.summary,
+        skills_json = excluded.skills_json,
+        tags_json = excluded.tags_json,
+        metadata_json = excluded.metadata_json,
+        updated_at = CURRENT_TIMESTAMP
+    `,
+    [
+      document.docType,
+      document.provider,
+      document.title,
+      document.sourceUrl,
+      document.roleTarget || null,
+      document.summary,
+      JSON.stringify(document.skills || []),
+      JSON.stringify(document.tags || []),
+      JSON.stringify(document.metadata || {})
+    ]
+  );
+}
+
+function getKnowledgeDocumentsByType(docType) {
+  return all("SELECT * FROM knowledge_documents WHERE doc_type = ? ORDER BY updated_at DESC, id DESC", [docType]);
+}
+
+function getAllKnowledgeDocuments() {
+  return all("SELECT * FROM knowledge_documents ORDER BY updated_at DESC, id DESC");
 }
 
 function createRememberToken({ userId, tokenHash, expiresAt }) {
@@ -228,6 +314,9 @@ module.exports = {
   getLatestExamAttemptByUserId,
   saveRoadmap,
   getLatestRoadmapByUserId,
+  upsertKnowledgeDocument,
+  getKnowledgeDocumentsByType,
+  getAllKnowledgeDocuments,
   createRememberToken,
   getRememberToken,
   deleteRememberToken,

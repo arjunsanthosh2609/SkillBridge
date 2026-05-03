@@ -1,0 +1,35 @@
+[
+  {
+    "provider": "LinkedIn",
+    "title": "Frontend Developer",
+    "sourceUrl": "https://www.linkedin.com/jobs/view/sample-frontend-role",
+    "roleTarget": "frontend",
+    "company": "Sample Product Co",
+    "location": "Bengaluru",
+    "summary": "Sample imported role emphasizing React, JavaScript, responsive UI work, accessibility, testing, and API integration.",
+    "skills": ["react", "javascript", "responsive design", "accessibility", "testing", "api"],
+    "tags": ["web", "mid-level", "product"]
+  },
+  {
+    "provider": "Indeed",
+    "title": "Data Analyst",
+    "sourceUrl": "https://www.indeed.com/viewjob?jk=sample-data-analyst-role",
+    "roleTarget": "data-analyst",
+    "company": "Sample Analytics Co",
+    "location": "Hyderabad",
+    "summary": "Sample imported analyst role requiring SQL, Python, dashboards, stakeholder communication, and business insight generation.",
+    "skills": ["sql", "python", "dashboards", "power bi", "communication"],
+    "tags": ["analytics", "reporting", "business"]
+  },
+  {
+    "provider": "Naukri",
+    "title": "Backend Developer",
+    "sourceUrl": "https://www.naukri.com/job-listings-sample-backend-role",
+    "roleTarget": "backend",
+    "company": "Sample Platform Co",
+    "location": "Pune",
+    "summary": "Sample imported backend role focusing on Node.js, APIs, SQL, deployment, debugging, and system reliability.",
+    "skills": ["node.js", "express", "sql", "api", "debugging", "deployment"],
+    "tags": ["backend", "service", "reliability"]
+  }
+]

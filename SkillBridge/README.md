@@ -10,6 +10,7 @@ SkillBridge is an AI resume screener and skill gap analyser built with Express, 
 - Goal-based exam page to measure actual skill level
 - Home dashboard with extracted skills, trending skills, exam access, and roadmap lock/unlock state
 - Personalized roadmap page generated from user goal, resume skills, and exam result
+- RAG-backed roadmap grounding using a local knowledge base of learning resources, datasets, and imported job-board requirements
 
 ## Run locally
 
@@ -34,3 +35,5 @@ npm start
 - Without a Gemini API key, the app uses built-in fallback content for trending skills, exam questions, and roadmaps.
 - Uploaded resumes are stored in the `uploads/` folder.
 - User and exam data are stored in `skillbridge.db`.
+- Curated learning resources and datasets are seeded from `data/knowledge-base/` on startup.
+- Real job-board grounding is imported from JSON files in `data/job-imports/`. Use the format described in `data/job-imports/README.md`.

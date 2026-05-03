@@ -20,20 +20,40 @@
   <section class="page-actions">
     <a class="ghost-btn" href="/home">Back to home</a>
     <a class="ghost-btn" href="/logout">Logout</a>
-    <% if (isSavedRoadmap) { %>
-      <a class="primary-btn" href="/roadmap">Regenerate roadmap</a>
-    <% } else { %>
-      <a class="ghost-btn" href="/roadmap/progress">Track progress</a>
-    <% } %>
+
   </section>
 
   <section class="dashboard-grid single">
+    <article class="card">
+      <div class="card-heading">
+        <h2>Job market signals</h2>
+        <p>Retrieved from the knowledge base using imported job descriptions that match your goal and skills.</p>
+      </div>
+      <% if (roadmap.jobSignals && roadmap.jobSignals.length) { %>
+        <div class="resource-list">
+          <% roadmap.jobSignals.forEach((signal) => { %>
+            <a class="resource-item" href="<%= signal.sourceUrl %>" target="_blank" rel="noreferrer">
+              <span class="resource-type">Job requirement</span>
+              <strong><%= signal.title %></strong>
+              <span class="resource-provider"><%= signal.provider %></span>
+              <span class="resource-why"><%= signal.summary %></span>
+            </a>
+          <% }); %>
+        </div>
+      <% } else { %>
+        <p class="resource-why">No real job-board descriptions have been imported yet. Add LinkedIn, Indeed, or Naukri JSON files in `data/job-imports/` to ground this section with live role requirements.</p>
+      <% } %>
+    </article>
+
     <% roadmap.phases.forEach((phase) => { %>
       <article class="card roadmap-phase">
         <div class="card-heading">
           <h2><%= phase.title %></h2>
           <p><%= phase.duration %></p>
         </div>
+        <% if (phase.objective) { %>
+          <p class="resource-why"><strong>Objective:</strong> <%= phase.objective %></p>
+        <% } %>
         <ul class="phase-list">
           <% phase.actions.forEach((action) => { %>
             <li><%= action %></li>
@@ -62,6 +82,25 @@
         <% } %>
       </article>
     <% }); %>
+
+    <% if (roadmap.datasetSuggestions && roadmap.datasetSuggestions.length) { %>
+      <article class="card">
+        <div class="card-heading">
+          <h2>Practice datasets and repositories</h2>
+          <p>Retrieved datasets and repos you can use to turn the roadmap into real projects.</p>
+        </div>
+        <div class="resource-list">
+          <% roadmap.datasetSuggestions.forEach((dataset) => { %>
+            <a class="resource-item" href="<%= dataset.sourceUrl %>" target="_blank" rel="noreferrer">
+              <span class="resource-type">Dataset / repository</span>
+              <strong><%= dataset.title %></strong>
+              <span class="resource-provider"><%= dataset.provider %></span>
+              <span class="resource-why"><%= dataset.summary %></span>
+            </a>
+          <% }); %>
+        </div>
+      </article>
+    <% } %>
   </section>
 </main>
 

@@ -1,0 +1,57 @@
+[
+  {
+    "docType": "public_dataset",
+    "provider": "Kaggle",
+    "title": "Titanic - Machine Learning from Disaster",
+    "sourceUrl": "https://www.kaggle.com/competitions/titanic",
+    "roleTarget": "data-scientist",
+    "summary": "Classic supervised learning dataset for binary classification, feature engineering, and model evaluation practice.",
+    "skills": ["python", "machine learning", "classification", "feature engineering"],
+    "tags": ["kaggle", "beginner", "supervised-learning"],
+    "metadata": { "sourceType": "competition" }
+  },
+  {
+    "docType": "public_dataset",
+    "provider": "Hugging Face Datasets",
+    "title": "imdb",
+    "sourceUrl": "https://huggingface.co/datasets/imdb",
+    "roleTarget": "machine-learning",
+    "summary": "Movie review sentiment dataset commonly used for NLP text classification, preprocessing, and transformer experiments.",
+    "skills": ["nlp", "python", "text classification"],
+    "tags": ["hugging-face", "nlp", "sentiment"],
+    "metadata": { "sourceType": "dataset" }
+  },
+  {
+    "docType": "public_dataset",
+    "provider": "GitHub",
+    "title": "Awesome Public Datasets",
+    "sourceUrl": "https://github.com/awesomedata/awesome-public-datasets",
+    "roleTarget": "data-analyst",
+    "summary": "Curated repository of public datasets across finance, healthcare, geospatial, NLP, and computer vision domains.",
+    "skills": ["data sourcing", "analysis", "exploration"],
+    "tags": ["github", "catalog", "datasets"],
+    "metadata": { "sourceType": "repository" }
+  },
+  {
+    "docType": "public_dataset",
+    "provider": "Kaggle",
+    "title": "House Prices - Advanced Regression Techniques",
+    "sourceUrl": "https://www.kaggle.com/competitions/house-prices-advanced-regression-techniques",
+    "roleTarget": "data-scientist",
+    "summary": "Regression-focused tabular dataset suitable for feature engineering, missing value handling, and model comparison.",
+    "skills": ["regression", "feature engineering", "python"],
+    "tags": ["kaggle", "tabular", "regression"],
+    "metadata": { "sourceType": "competition" }
+  },
+  {
+    "docType": "public_dataset",
+    "provider": "GitHub",
+    "title": "RealWorld Example Apps",
+    "sourceUrl": "https://github.com/gothinkster/realworld",
+    "roleTarget": "full-stack",
+    "summary": "Production-style open source application examples useful as project datasets for API design, auth flows, and architecture study.",
+    "skills": ["api", "full stack", "authentication", "architecture"],
+    "tags": ["github", "reference-app", "project-based"],
+    "metadata": { "sourceType": "repository" }
+  }
+]

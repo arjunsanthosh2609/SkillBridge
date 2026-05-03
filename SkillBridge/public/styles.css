@@ -328,6 +328,10 @@ textarea {
   background: rgba(255, 255, 255, 0.72);
 }
 
+.resource-item strong {
+  line-height: 1.4;
+}
+
 .resource-type,
 .resource-provider {
   color: var(--muted);

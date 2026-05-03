@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SkillBridge AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <nav class="topbar">
+          <div class="brand">
+            <div class="brand-mark">SB</div>
+            <div>
+              <p>SkillBridge AI</p>
+              <span>Resume Screening and Skill Gap Analyzer</span>
+            </div>
+          </div>
+          <a class="ghost-link" href="#workspace">Open Demo</a>
+        </nav>
+
+        <div class="hero-grid">
+          <section class="hero-copy">
+            <p class="eyebrow">Major Project Prototype</p>
+            <h1>Turn a resume into a skill gap report and learning roadmap.</h1>
+            <p class="hero-text">
+              A clean demo web app for resume screening, skill comparison, roadmap
+              generation, and future trend suggestions.
+            </p>
+            <div class="hero-actions">
+              <a class="primary-btn" href="#workspace">Try the Analyzer</a>
+              <a class="secondary-btn" href="#architecture">View Modules</a>
+            </div>
+          </section>
+
+          <aside class="hero-panel">
+            <div class="panel-card rise">
+              <p class="card-label">Live Snapshot</p>
+              <div class="metric-row">
+                <div>
+                  <span>Resume match</span>
+                  <strong id="heroMatch">76%</strong>
+                </div>
+                <div>
+                  <span>Gap priority</span>
+                  <strong>Medium</strong>
+                </div>
+              </div>
+              <div class="chip-row">
+                <span>Python</span>
+                <span>SQL</span>
+                <span>Power BI</span>
+                <span>Missing: Tableau</span>
+              </div>
+            </div>
+            <div class="panel-card drift">
+              <p class="card-label">Roadmap Highlights</p>
+              <ul class="mini-list">
+                <li>Week 1-2: Data storytelling basics</li>
+                <li>Week 3-4: Dashboard portfolio project</li>
+                <li>Week 5-6: Interview-ready case practice</li>
+              </ul>
+            </div>
+          </aside>
+        </div>
+      </header>
+
+      <main>
+        <section class="feature-strip" id="architecture">
+          <article>
+            <p>Resume Processing</p>
+            <span>PDF/text intake and structured extraction</span>
+          </article>
+          <article>
+            <p>Skill Gap Engine</p>
+            <span>Role-wise comparison with internal skill database</span>
+          </article>
+          <article>
+            <p>AI Roadmap</p>
+            <span>RAG-style recommendations and learning sequence</span>
+          </article>
+          <article>
+            <p>Trend Insights</p>
+            <span>Future skill demand and role suggestions</span>
+          </article>
+        </section>
+
+        <section class="workspace" id="workspace">
+          <div class="section-heading">
+            <p class="eyebrow">Interactive Workspace</p>
+            <h2>Demo the complete analysis flow</h2>
+          </div>
+
+          <div class="workspace-grid">
+            <form class="control-card" id="analyzerForm">
+              <label class="field">
+                <span>Candidate name</span>
+                <input id="candidateName" type="text" value="Arjun Sharma" />
+              </label>
+
+              <label class="field">
+                <span>Target job role</span>
+                <select id="jobRole">
+                  <option value="data-analyst">Data Analyst</option>
+                  <option value="frontend-developer">Frontend Developer</option>
+                  <option value="ml-engineer">ML Engineer</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Resume text / extracted skills</span>
+                <textarea id="resumeText" rows="9">
+Python, SQL, Excel, Power BI, Statistics, Communication, Data Cleaning, Pandas, NumPy, Presentation Skills
+                </textarea>
+              </label>
+
+              <label class="switch">
+                <input id="trendToggle" type="checkbox" checked />
+                <span>Enable future trend recommendations</span>
+              </label>
+
+              <button class="primary-btn full-width" type="submit">
+                Analyze Resume
+              </button>
+            </form>
+
+            <section class="results-panel">
+              <div class="summary-card">
+                <div>
+                  <p class="card-label">Candidate</p>
+                  <h3 id="candidateDisplay">Arjun Sharma</h3>
+                </div>
+                <div class="score-ring">
+                  <span id="matchScore">76%</span>
+                  <small>Role Match</small>
+                </div>
+              </div>
+
+              <div class="result-grid">
+                <article class="result-card">
+                  <div class="result-card-head">
+                    <h4>Detected Skills</h4>
+                    <span id="skillCount">10 skills</span>
+                  </div>
+                  <div class="tag-cloud" id="detectedSkills"></div>
+                </article>
+
+                <article class="result-card">
+                  <div class="result-card-head">
+                    <h4>Missing Skills</h4>
+                    <span id="gapLevel">Priority Medium</span>
+                  </div>
+                  <div class="tag-cloud warning" id="missingSkills"></div>
+                </article>
+
+                <article class="result-card wide">
+                  <div class="result-card-head">
+                    <h4>Personalized Roadmap</h4>
+                    <span>AI-generated plan</span>
+                  </div>
+                  <div class="roadmap" id="roadmapList"></div>
+                </article>
+
+                <article class="result-card wide" id="trendCard">
+                  <div class="result-card-head">
+                    <h4>Future Trend Insights</h4>
+                    <span>Optional module</span>
+                  </div>
+                  <div class="trend-list" id="trendList"></div>
+                </article>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="diagram-section">
+          <div class="section-heading">
+            <p class="eyebrow">Architecture View</p>
+            <h2>Plain-text module mapping for your presentation</h2>
+          </div>
+
+          <div class="diagram-card">
+            <pre id="architectureText">User Interface -> Resume Processing -> Skill Extraction
+User Interface -> Job Role Selection -> Job Requirement Database
+Skill Extraction + Job Requirement Database -> Skill Gap Analysis Engine
+Skill Gap Analysis -> Personalized Roadmap Generator
+Skill Gap Analysis -> Optional Trend Prediction Module
+Roadmap Generator + Trend Prediction + Gap Report -> Output and Visualization Layer</pre>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
