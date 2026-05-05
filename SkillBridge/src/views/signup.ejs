@@ -83,6 +83,12 @@
         </label>
       </div>
 
+      
+        
+      <div id="scan-status" style="margin-top: 10px; font-size: 0.9rem; color: #28a745; font-weight: bold;"></div>
+        
+        <input type="hidden" name="resumeSkills" id="resumeSkillsHidden">
+      </div>
       <label>
         Resume document
         <input type="file" name="resume" accept=".pdf,.docx,.txt" required />
@@ -97,5 +103,61 @@
     </p>
   </section>
 </main>
+
+<script>
+    const startScanBtn = document.getElementById('start-scan');
+    const cameraContainer = document.getElementById('camera-container');
+    const video = document.getElementById('video');
+    const captureBtn = document.getElementById('capture-btn');
+    const canvas = document.getElementById('canvas');
+    const scanStatus = document.getElementById('scan-status');
+    const skillsHiddenInput = document.getElementById('resumeSkillsHidden');
+
+    startScanBtn.addEventListener('click', async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+            cameraContainer.style.display = 'block';
+            startScanBtn.style.display = 'none';
+        } catch (err) {
+            alert("Could not access camera. Please check permissions.");
+        }
+    });
+
+    captureBtn.addEventListener('click', async () => {
+        const context = canvas.getContext('2d');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const imageData = canvas.toDataURL('image/jpeg');
+        captureBtn.innerText = "Processing OCR...";
+        captureBtn.disabled = true;
+
+        try {
+            const response = await fetch('/extract-skills', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: imageData })
+            });
+
+            const result = await response.json();
+            if (result.success && result.skills.length > 0) {
+                const skillString = result.skills.join(', ');
+                scanStatus.innerText = "Detected: " + skillString;
+                skillsHiddenInput.value = skillString; // Sets the hidden field for form POST
+                alert("Skills detected and saved to your profile!");
+            } else {
+                scanStatus.innerText = "No skills detected. Try a clearer photo.";
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Error connecting to server.");
+        } finally {
+            captureBtn.innerText = "Take Snap & Extract";
+            captureBtn.disabled = false;
+        }
+    });
+</script>
 
 <%- include("partials/foot") %>
