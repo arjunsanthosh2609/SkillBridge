@@ -96,6 +96,17 @@ function initDb() {
       )
     `);
 
+    db.run(`CREATE TABLE IF NOT EXISTS resume_suggestions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    ats_score INTEGER,
+    suggestions_json TEXT,
+    target_role TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  )`);
+
+
     db.run(`
       CREATE TABLE IF NOT EXISTS knowledge_documents (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -304,6 +315,28 @@ function deleteExpiredRememberTokens() {
   return run("DELETE FROM remember_tokens WHERE datetime(expires_at) <= datetime('now')");
 }
 
+function saveResumeSuggestion({ userId, atsScore, targetRole, suggestionJson }) {
+    return new Promise((resolve, reject) => {
+        const sql = `INSERT INTO resume_suggestions (user_id, ats_score, target_role, suggestions_json) VALUES (?, ?, ?, ?)`;
+        db.run(sql, [userId, atsScore, targetRole, suggestionJson], (err) => err ? reject(err) : resolve());
+    });
+}
+
+function getLatestSuggestionByUserId(userId) {
+    return new Promise((resolve, reject) => {
+        const sql = `SELECT * FROM resume_suggestions WHERE user_id = ? ORDER BY created_at DESC LIMIT 1`;
+        db.get(sql, [userId], (err, row) => err ? reject(err) : resolve(row));
+    });
+}
+
+
+function updateResumeText(userId, text) {
+    return new Promise((resolve, reject) => {
+        const sql = `UPDATE users SET resume_text = ? WHERE id = ?`;
+        db.run(sql, [text, userId], (err) => err ? reject(err) : resolve());
+    });
+}
+
 module.exports = {
   initDb,
   createUser,
@@ -320,5 +353,8 @@ module.exports = {
   createRememberToken,
   getRememberToken,
   deleteRememberToken,
-  deleteExpiredRememberTokens
+  deleteExpiredRememberTokens,
+  saveResumeSuggestion,
+  getLatestSuggestionByUserId,
+  updateResumeText 
 };

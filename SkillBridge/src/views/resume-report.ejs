@@ -1,0 +1,424 @@
+<%- include("partials/head", { title: "Resume Report" }) %>
+
+<main class="page-shell">
+  <section class="topbar">
+    <div>
+      <p class="eyebrow">Analytical Pipeline</p>
+      <h1>Resume Optimization Report</h1>
+      <p class="subtle">Target Role: <strong><%= user.goal %></strong></p>
+    </div>
+    <div class="status-pill">
+      <span>ATS Score</span>
+      <% if (report) { %>
+        <strong><%= report.score %>%</strong>
+      <% } else { %>
+        <strong>0%</strong>
+      <% } %>
+    </div>
+  </section>
+
+  <section class="page-actions">
+    <a class="ghost-btn" href="/home">Back to home</a>
+    <form action="/resume-suggestions" method="POST" style="display: inline;">
+        <button type="submit" class="primary-btn">Refresh Analysis</button>
+    </form>
+  </section>
+
+  <section class="dashboard-grid single">
+    <% if (report) { %>
+      <article class="card">
+        <div class="card-heading">
+          <h2>ATS Match Progress</h2>
+          <p>Keyword Density & Structural Analysis</p>
+        </div>
+        <div class="progress-container" style="background: var(--border-color); height: 12px; border-radius: 6px; margin: 20px 0; overflow: hidden;">
+            <div class="progress-bar" style="--progress: <%= report.score %>%; width: var(--progress);"></div>
+        </div>
+        <p class="subtle">Your resume is <%= report.score %>% optimized for a <%= user.goal %> position.</p>
+      </article>
+
+      <article class="card">
+        <div class="card-heading">
+          <h2>Skill Gap Analysis</h2>
+          <p>Missing Industry Keywords</p>
+        </div>
+        <div style="margin-top: 15px;">
+          <% const keywords = report.missingKeywords || []; %>
+          <% if (keywords.length > 0) { %>
+            <% keywords.forEach((skill) => { %>
+              <span class="resource-type" style="background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; margin-right: 5px; display: inline-block; margin-bottom: 5px;">
+                + <%= skill %>
+              </span>
+            <% }); %>
+          <% } else { %>
+            <p>No major gaps identified.</p>
+          <% } %>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-heading">
+          <h2>LLM Optimization</h2>
+          <p>Professional experience rewrites (Click to add to editor)</p>
+        </div>
+        <div class="resource-block">
+          <div class="resource-list">
+            <% const points = report.rewrittenPoints || []; %>
+            <% if (points.length > 0) { %>
+              <% points.forEach((point) => {
+                    const suggestionText = typeof point === 'object' && point !== null
+                      ? (point.text || point.value || JSON.stringify(point))
+                      : String(point);
+              %>
+                <div class="resource-item suggestion-btn" 
+                    style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;"
+                    data-suggestion="<%= encodeURIComponent(suggestionText) %>">
+                  <div>
+                    <span class="resource-type">SUGGESTION</span>
+                    <strong style="display:block; margin-top:4px;">"<%= suggestionText %>"</strong>
+                    <span class="resource-why">Click to insert this optimized point into the editor.</span>
+                  </div>
+                  <button type="button" style="padding: 6px 12px; border:1px solid #111; border-radius:6px; background:#fff; color:#111; cursor:pointer;">Insert</button>
+                </div>
+              <% }); %>
+            <% } else { %>
+              <p>No suggestions generated.</p>
+            <% } %>
+          </div>
+        </div>
+      </article>
+    <% } else { %>
+      <article class="card">
+        <div class="card-heading">
+          <h2>No analysis yet</h2>
+          <p>Your uploaded resume is available below for editing and download.</p>
+        </div>
+      </article>
+    <% } %>
+
+    <article class="card">
+      <div class="card-heading">
+        <h2>Resume Editor</h2>
+        <p>Edit the uploaded resume text and preview the formatted output before downloading.</p>
+      </div>
+      <div style="display: grid; gap: 20px; grid-template-columns: 1fr 1fr; margin: 15px 0;">
+        <div>
+          <label for="resumeEditor" style="font-weight: 700; display: block; margin-bottom: 8px;">Resume Text</label>
+          <textarea id="resumeEditor" style="width: 100%; min-height: 420px; padding: 16px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--card-bg); color: var(--text-main); line-height: 1.5; font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; resize: vertical;"></textarea>
+        </div>
+        <div>
+          <label style="font-weight: 700; display: block; margin-bottom: 8px;">Live Preview</label>
+          <div id="resumePreview" style="width: 100%; min-height: 420px; padding: 20px; border: 1px solid var(--border-color); border-radius: 12px; background: #fff; overflow-wrap: break-word;"></div>
+        </div>
+      </div>
+      <p style="color: #666; font-size: 0.95rem; margin-bottom: 16px;">Edit the left pane and the right preview updates automatically. Download will preserve this formatted layout.</p>
+
+      <div class="page-actions" style="justify-content: flex-start; gap: 10px; padding: 0;">
+        <button type="button" class="primary-btn" onclick="saveToProfile()">Save Changes</button>
+        <button type="button" class="ghost-btn" onclick="downloadAsPDF()">Download PDF</button>
+      </div>
+      <div id="pdfStatus" style="margin-top: 12px; color: var(--text-main); font-size: 0.95rem; min-height: 1.2rem;"></div>
+    </article>
+  </section>
+</main>
+
+<script>
+  // Safely get resume text from server
+  let resumeTextFromServer = '';
+  try {
+    resumeTextFromServer = `<%- JSON.stringify(user && user.resume_text ? user.resume_text.trim() : "") %>`;
+  } catch (e) {
+    resumeTextFromServer = '';
+  }
+
+  const fallbackText = `Your Name
+Email | Phone | Location
+
+CAREER OBJECTIVE
+Write a short objective here.
+
+EDUCATION
+Your education details here.
+
+SKILLS
+Your skills here.
+
+EXPERIENCE
+Your experience details here.`;
+
+  // Utility Functions
+  function escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    return String(unsafe)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function normalizeHeading(line) {
+    return line.replace(/[:\s]+$/, '').trim();
+  }
+
+  function formatForEditor(text) {
+    if (!text || text.trim().length === 0) {
+      return fallbackText;
+    }
+
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length < 2) return text;
+
+    const headerName = lines[0];
+    const headerContact = lines[1];
+    const bodyLines = lines.slice(2);
+
+    let formatted = headerName + '\n' + headerContact + '\n\n';
+
+    let currentSection = '';
+    for (let i = 0; i < bodyLines.length; i++) {
+      const line = bodyLines[i];
+      if (isSectionHeading(line) || (line.length > 0 && line === line.toUpperCase() && !line.startsWith('•'))) {
+        if (currentSection) formatted += '\n';
+        formatted += normalizeHeading(line) + '\n';
+        currentSection = normalizeHeading(line);
+      } else if (line.length > 0) {
+        const match = line.match(/^([•*\-]|\d+\.)\s*(.*)$/);
+        if (match) {
+          formatted += '• ' + match[2] + '\n';
+        } else {
+          formatted += line + '\n';
+        }
+      }
+    }
+
+    return formatted.trim();
+  }
+
+  function isSectionHeading(line) {
+    const headings = ['SUMMARY', 'PROFILE', 'EXPERIENCE', 'EDUCATION', 'SKILLS', 'CERTIFICATIONS', 'PROJECTS', 'ACHIEVEMENTS', 'CONTACT', 'CAREER OBJECTIVE', 'TECHNICAL SKILLS', 'EDUCATIONAL QUALIFICATION', 'PROJECTS / EXPERIENCE', 'LANGUAGES'];
+    return headings.includes(normalizeHeading(line).toUpperCase());
+  }
+
+  function buildPreviewHtml(text) {
+    if (!text || text.trim().length === 0) {
+      return '<div style="font-family: Arial, sans-serif; color: #999; padding: 20px; text-align: center;">Resume preview will appear here as you edit.</div>';
+    }
+
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length < 2) return '<div style="padding:20px; color:#999;">Add your name and contact info as the first two lines of your resume.</div>';
+
+    const headerName = lines[0];
+    const headerContact = lines[1];
+    const bodyLines = lines.slice(2);
+    const sections = [];
+    let currentSection = { title: '', items: [] };
+
+    for (let i = 0; i < bodyLines.length; i++) {
+      const line = bodyLines[i];
+      if (isSectionHeading(line) || (line.length > 0 && line === line.toUpperCase() && !line.startsWith('•'))) {
+        if (currentSection.title && currentSection.items.length > 0) {
+          sections.push({ ...currentSection });
+        }
+        currentSection = { title: normalizeHeading(line), items: [] };
+      } else if (line.length > 0) {
+        currentSection.items.push(line);
+      }
+    }
+
+    if (currentSection.title && currentSection.items.length > 0) {
+      sections.push(currentSection);
+    }
+
+    // If no sections detected, create a default section with all body lines
+    if (sections.length === 0 && bodyLines.length > 0) {
+      sections.push({ title: 'Resume Details', items: bodyLines });
+    }
+
+    let html = `<div style="font-family: Arial, sans-serif; color: #222; line-height: 1.6; font-size: 13px;">
+      <div style="text-align: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #000;">
+        <div style="font-size: 20px; font-weight: bold;">${escapeHtml(headerName)}</div>
+        <div style="font-size: 11px; color: #555; margin-top: 6px;">${escapeHtml(headerContact)}</div>
+      </div>`;
+
+    sections.forEach((section) => {
+      html += `<div style="margin-bottom: 15px;">
+        <div style="font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; border-bottom: 1px solid #ccc; padding-bottom: 4px;">${escapeHtml(section.title)}</div>`;
+
+      section.items.forEach((item) => {
+        const match = item.match(/^([•*\-]|\d+\.)\s*(.*)$/);
+        if (match) {
+          html += `<div style="margin: 4px 0 4px 20px;">• ${escapeHtml(match[2])}</div>`;
+        } else {
+          html += `<div style="margin: 4px 0;">${escapeHtml(item)}</div>`;
+        }
+      });
+
+      html += `</div>`;
+    });
+
+    html += '</div>';
+    return html;
+  }
+
+  // Core Functions
+  function getEditorText() {
+    const editor = document.getElementById('resumeEditor');
+    return editor ? editor.value : '';
+  }
+
+  function setEditorText(text) {
+    const editor = document.getElementById('resumeEditor');
+    if (editor) {
+      editor.value = text || '';
+    }
+  }
+
+  function updatePreview() {
+    const preview = document.getElementById('resumePreview');
+    if (preview) {
+      preview.innerHTML = buildPreviewHtml(getEditorText());
+    }
+  }
+
+  function setPdfStatus(msg, isError) {
+    const status = document.getElementById('pdfStatus');
+    if (status) {
+      status.textContent = msg;
+      status.style.color = isError ? '#e74c3c' : '#27ae60';
+    }
+  }
+
+  function appendToEditor(text) {
+    if (!text) return;
+    const editor = document.getElementById('resumeEditor');
+    if (!editor) return;
+
+    text = text.trim();
+    const pos = editor.selectionStart || editor.value.length;
+    const before = editor.value.substring(0, pos);
+    const after = editor.value.substring(pos);
+    const newline = before && !before.endsWith('\n') ? '\n' : '';
+
+    editor.value = before + newline + '• ' + text + '\n' + after;
+    updatePreview();
+    editor.focus();
+  }
+
+  async function saveToProfile() {
+    const text = getEditorText();
+    if (!text.trim()) {
+      alert('Resume is empty. Please add content.');
+      return;
+    }
+
+    setPdfStatus('Saving...', false);
+
+    try {
+      const response = await fetch('/save-edited-resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ editedText: text })
+      });
+
+      if (!response.ok) {
+        throw new Error('Save failed');
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        setPdfStatus('Saved successfully!', false);
+      } else {
+        setPdfStatus('Failed to save', true);
+      }
+    } catch (err) {
+      console.error('Save error:', err);
+      setPdfStatus('Error saving resume', true);
+    }
+  }
+
+  async function downloadAsPDF() {
+    const text = getEditorText();
+    if (!text.trim()) {
+      alert('Resume is empty. Please add content.');
+      return;
+    }
+
+    setPdfStatus('Downloading PDF...', false);
+
+    try {
+      const response = await fetch('/generate-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resumeText: text })
+      });
+
+      if (!response.ok) {
+        throw new Error('PDF generation failed');
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'SkillBridge_Resume.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setPdfStatus('PDF downloaded!', false);
+    } catch (err) {
+      console.error('PDF error:', err);
+      setPdfStatus('Error creating PDF', true);
+    }
+  }
+
+  // Initialize on load
+  function init() {
+    console.log('Initializing resume editor...');
+    
+    // Load resume text
+    const textToLoad = resumeTextFromServer || fallbackText;
+    setEditorText(formatForEditor(textToLoad));
+    updatePreview();
+
+    // Attach input listener
+    const editor = document.getElementById('resumeEditor');
+    if (editor) {
+      editor.addEventListener('input', function() {
+        updatePreview();
+      });
+      console.log('Editor listener attached');
+    }
+
+    // Attach click listener for suggestions
+    document.addEventListener('click', function(e) {
+      if (e.target.closest('.suggestion-btn')) {
+        const div = e.target.closest('.suggestion-btn');
+        const value = div.getAttribute('data-suggestion');
+        if (value) {
+          console.log('Suggestion clicked:', value);
+          try {
+            appendToEditor(decodeURIComponent(value));
+          } catch (err) {
+            console.error('Error:', err);
+          }
+        }
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    });
+
+    console.log('Resume editor initialized');
+  }
+
+  // Run init immediately
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+</script>
+
+<%- include("partials/foot") %>

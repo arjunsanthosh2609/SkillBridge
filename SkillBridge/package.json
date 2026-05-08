@@ -10,14 +10,17 @@
     "@google/genai": "^1.20.0",
     "bcryptjs": "^2.4.3",
     "compromise": "^14.15.0",
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.6.1",
     "ejs": "^3.1.10",
-    "express": "^4.21.2",
-    "express-session": "^1.18.1",
+    "express": "^4.22.1",
+    "express-session": "^1.19.0",
     "mammoth": "^1.8.0",
-    "multer": "^2.0.2",
+    "multer": "^2.1.1",
     "natural": "^8.1.1",
     "pdf-parse": "^1.1.1",
-    "sqlite3": "^5.1.7"
+    "pdfkit": "^0.18.0",
+    "qrcode": "^1.5.4",
+    "sqlite3": "^5.1.7",
+    "tesseract.js": "^7.0.0"
   }
 }
