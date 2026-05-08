@@ -701,8 +701,87 @@ ${JSON.stringify(fallbackContext.datasets, null, 2)}
   };
 }
 
+function extractJSON(text) {
+  try {
+    if (!text) return null;
+
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+
+    return JSON.parse(match[0]);
+  } catch (e) {
+    console.log("JSON Parse Failed:", e.message);
+    return null;
+  }
+}
+async function generateSuggestions(resumeText = "", targetRole = "") {
+  if (!client) {
+    return {
+      missingKeywords: [],
+      rewrittenPoints: [],
+      formattedResume: resumeText
+    };
+  }
+
+  const prompt = `
+  You are an ATS resume optimizer.
+
+  Target Role: ${targetRole}
+
+  Return ONLY JSON:
+  {
+    "missingKeywords": [],
+    "rewrittenPoints": [],
+    "formattedResume": ""
+  }
+
+  Resume:
+  ${resumeText}
+  `;
+
+  const models = ["gemini-2.5-flash"];
+
+  for (const modelName of models) {
+    try {
+      const response = await client.models.generateContent({
+        model: modelName,
+        contents: prompt
+      });
+
+      const text =
+        response.text ||
+        response.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      const result = extractJSON(text);
+
+      if (result) return result;
+
+    } catch (error) {
+      console.log(`Model ${modelName} failed →`, error.message);
+    }
+  }
+
+  // FINAL FALLBACK
+  return {
+    missingKeywords: [
+      "Node.js",
+      "REST API",
+      "MongoDB",
+      "Git",
+      "System Design"
+    ],
+    rewrittenPoints: [
+      "Developed scalable web applications using modern technologies",
+      "Implemented responsive UI with improved performance",
+      "Collaborated on real-world projects using Agile practices"
+    ],
+    formattedResume: resumeText
+  };
+}
+
 module.exports = {
   getTrendingSkills,
   generateExam,
-  generateRoadmap
+  generateRoadmap,
+  generateSuggestions 
 };

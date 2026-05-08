@@ -1,4 +1,6 @@
 <%- include("partials/head", { title: "Sign Up" }) %>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
 
 <main class="auth-shell">
   <section class="hero-panel">
@@ -83,81 +85,91 @@
         </label>
       </div>
 
-      
-        
-      <div id="scan-status" style="margin-top: 10px; font-size: 0.9rem; color: #28a745; font-weight: bold;"></div>
-        
-        <input type="hidden" name="resumeSkills" id="resumeSkillsHidden">
-      </div>
-      <label>
-        Resume document
-        <input type="file" name="resume" accept=".pdf,.docx,.txt" required />
-      </label>
+            <div class="field-group">
+                <label>Resume document (Optional if using mobile)</label>
+                <input type="file" id="resumeFile" name="resume" class="form-control" />
+                
+                <div id="scan-status" class="mt-2" style="font-size: 0.85rem; font-weight: bold;"></div>
+                
+                <div class="mt-2 text-start">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="openMobileScanner()">
+                        <i class="bi bi-phone"></i> Upload from Mobile
+                    </button>
+                </div>
+            </div>
 
-      <button class="primary-btn" type="submit">Create account and analyse resume</button>
-    </form>
-
-    <p class="auth-switch">
-      Already have an account?
-      <a href="/login">Login here</a>
-    </p>
-  </section>
+            <button class="primary-btn" type="submit">Create account and analyse resume</button>
+            <p class="auth-footer">Already have an account? <a href="/login">Login here</a></p>
+        </form>
+    </section>
 </main>
 
+<div class="modal fade" id="mobileScannerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content" style="border-radius: 20px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+            <div class="modal-body text-center style=padding-left:270px:">
+                <h6 class="mb-3">Scan with Mobile</h6>
+                <div id="qrcode" class="d-flex justify-content-center mb-3"></div>
+                <div id="scanStatusBadge" class="badge bg-secondary">Waiting for scan...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/bootstrap.bundle.min.js"></script>
+
 <script>
-    const startScanBtn = document.getElementById('start-scan');
-    const cameraContainer = document.getElementById('camera-container');
-    const video = document.getElementById('video');
-    const captureBtn = document.getElementById('capture-btn');
-    const canvas = document.getElementById('canvas');
-    const scanStatus = document.getElementById('scan-status');
-    const skillsHiddenInput = document.getElementById('resumeSkillsHidden');
+let scanInterval;
 
-    startScanBtn.addEventListener('click', async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            video.srcObject = stream;
-            cameraContainer.style.display = 'block';
-            startScanBtn.style.display = 'none';
-        } catch (err) {
-            alert("Could not access camera. Please check permissions.");
-        }
+function openMobileScanner() {
+    const sessionId = 'SB-' + Math.random().toString(36).substr(2, 9);
+    // Ensure this matches your ipconfig IP (10.112.80.103)
+    const mobileUrl = 'http://10.112.80.103:3000/mobile-upload-page?id=' + sessionId;
+    
+    document.getElementById("qrcode").innerHTML = "";
+    new QRCode(document.getElementById("qrcode"), { 
+        text: mobileUrl, 
+        width: 160, 
+        height: 160,
+        colorDark : "#000000",
+        colorLight : "#ffffff",
+        correctLevel : QRCode.CorrectLevel.H
     });
 
-    captureBtn.addEventListener('click', async () => {
-        const context = canvas.getContext('2d');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const modalElement = document.getElementById('mobileScannerModal');
+    const myModal = bootstrap.Modal.getOrCreateInstance(modalElement);
+    myModal.show();
 
-        const imageData = canvas.toDataURL('image/jpeg');
-        captureBtn.innerText = "Processing OCR...";
-        captureBtn.disabled = true;
-
+    // Check for data every 2 seconds
+    scanInterval = setInterval(async () => {
         try {
-            const response = await fetch('/extract-skills', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ image: imageData })
-            });
+            const res = await fetch('/check-scan/' + sessionId);
+            const data = await res.json();
 
-            const result = await response.json();
-            if (result.success && result.skills.length > 0) {
-                const skillString = result.skills.join(', ');
-                scanStatus.innerText = "Detected: " + skillString;
-                skillsHiddenInput.value = skillString; // Sets the hidden field for form POST
-                alert("Skills detected and saved to your profile!");
-            } else {
-                scanStatus.innerText = "No skills detected. Try a clearer photo.";
+            if (data.status === 'completed') {
+                document.getElementById('mobileScannedSkills').value = data.skills;
+                document.getElementById('scan-status').innerHTML = `<span style="color: #28a745;">✅ Skills Synchronized: ${data.skills}</span>`;
+                
+                const badge = document.getElementById('scanStatusBadge');
+                badge.className = "badge bg-success";
+                badge.innerText = "Connected!";
+                
+                clearInterval(scanInterval);
+                setTimeout(() => myModal.hide(), 1500);
             }
-        } catch (err) {
-            console.error(err);
-            alert("Error connecting to server.");
-        } finally {
-            captureBtn.innerText = "Take Snap & Extract";
-            captureBtn.disabled = false;
-        }
-    });
-</script>
+        } catch (err) { console.error("Sync error:", err); }
+    }, 2000); 
+}
 
-<%- include("partials/foot") %>
+// Client-side validation: must have file OR mobile scan
+document.getElementById('signupForm').addEventListener('submit', function(e) {
+    const hasFile = document.getElementById('resumeFile').files.length > 0;
+    const hasMobile = document.getElementById('mobileScannedSkills').value.length > 0;
+
+    if (!hasFile && !hasMobile) {
+        e.preventDefault();
+        alert("Please upload a resume file OR use the mobile scanner to continue.");
+    }
+});
+</script>
