@@ -5,7 +5,7 @@
     <div>
       <p class="eyebrow">Roadmap</p>
       <h1><%= roadmap.headline %></h1>
-      <p class="subtle"><%= roadmap.summary %></p>
+      <p class="subtle">“Discipline is choosing between what you want now and what you want most.” — Abraham Lincoln</p>
     </div>
     <div class="status-pill">
       <span><%= isSavedRoadmap ? "View mode" : "Generated now" %></span>
@@ -19,31 +19,56 @@
 
   <section class="page-actions">
     <a class="ghost-btn" href="/home">Back to home</a>
-    <a class="ghost-btn" href="/logout">Logout</a>
 
   </section>
 
   <section class="dashboard-grid single">
-    <article class="card">
-      <div class="card-heading">
-        <h2>Job market signals</h2>
-        <p>Retrieved from the knowledge base using imported job descriptions that match your goal and skills.</p>
-      </div>
-      <% if (roadmap.jobSignals && roadmap.jobSignals.length) { %>
-        <div class="resource-list">
-          <% roadmap.jobSignals.forEach((signal) => { %>
-            <a class="resource-item" href="<%= signal.sourceUrl %>" target="_blank" rel="noreferrer">
-              <span class="resource-type">Job requirement</span>
-              <strong><%= signal.title %></strong>
-              <span class="resource-provider"><%= signal.provider %></span>
-              <span class="resource-why"><%= signal.summary %></span>
-            </a>
-          <% }); %>
+    <% if (roadmap.answers) { %>
+      <article class="card">
+        <div class="card-heading">
+          <h2>Roadmap Summary</h2>
+          <p>A direct answer to where you stand and what comes next.</p>
         </div>
-      <% } else { %>
-        <p class="resource-why">No real job-board descriptions have been imported yet. Add LinkedIn, Indeed, or Naukri JSON files in `data/job-imports/` to ground this section with live role requirements.</p>
-      <% } %>
-    </article>
+        <div class="resource-list">
+          <% if (roadmap.answers.whereAmINow) { %>
+            <div class="resource-item">
+              <strong>1. Where am I now?</strong>
+              <span class="resource-why"><%= roadmap.answers.whereAmINow %></span>
+            </div>
+          <% } %>
+          <% if (roadmap.answers.whatAmIMissing) { %>
+            <div class="resource-item">
+              <strong>2. What am I missing?</strong>
+              <span class="resource-why"><%= roadmap.answers.whatAmIMissing %></span>
+            </div>
+          <% } %>
+          <% if (roadmap.answers.whatShouldILearnNext) { %>
+            <div class="resource-item">
+              <strong>3. What should I learn next?</strong>
+              <span class="resource-why"><%= roadmap.answers.whatShouldILearnNext %></span>
+            </div>
+          <% } %>
+          <% if (roadmap.answers.whyShouldILearnIt) { %>
+            <div class="resource-item">
+              <strong>4. Why should I learn it?</strong>
+              <span class="resource-why"><%= roadmap.answers.whyShouldILearnIt %></span>
+            </div>
+          <% } %>
+          <% if (roadmap.answers.howShouldILearnIt) { %>
+            <div class="resource-item">
+              <strong>5. How should I learn it?</strong>
+              <span class="resource-why"><%= roadmap.answers.howShouldILearnIt %></span>
+            </div>
+          <% } %>
+          <% if (roadmap.answers.whenAmIJobReady) { %>
+            <div class="resource-item">
+              <strong>6. When am I job-ready?</strong>
+              <span class="resource-why"><%= roadmap.answers.whenAmIJobReady %></span>
+            </div>
+          <% } %>
+        </div>
+      </article>
+    <% } %>
 
     <% roadmap.phases.forEach((phase) => { %>
       <article class="card roadmap-phase">
@@ -54,32 +79,61 @@
         <% if (phase.objective) { %>
           <p class="resource-why"><strong>Objective:</strong> <%= phase.objective %></p>
         <% } %>
-        <ul class="phase-list">
-          <% phase.actions.forEach((action) => { %>
-            <li><%= action %></li>
-          <% }); %>
-        </ul>
-
-        <% if (phase.resources && phase.resources.length) { %>
+        <% if (phase.actions && phase.actions.length) { %>
           <div class="resource-block">
-            <h3>Study materials</h3>
-            <div class="resource-list">
-              <% phase.resources.forEach((resource) => { %>
-                <a class="resource-item" href="<%= resource.url %>" target="_blank" rel="noreferrer">
-                  <span class="resource-type"><%= resource.type %></span>
-                  <strong><%= resource.title %></strong>
-                  <span class="resource-provider"><%= resource.provider %></span>
-                  <% if (resource.focus) { %>
-                    <span class="resource-focus"><%= resource.focus %></span>
-                  <% } %>
-                  <% if (resource.why) { %>
-                    <span class="resource-why"><%= resource.why %></span>
-                  <% } %>
-                </a>
+            <h3>Focus areas</h3>
+            <ul class="phase-list">
+              <% phase.actions.forEach((action) => { %>
+                <li><%= action %></li>
               <% }); %>
-            </div>
+            </ul>
           </div>
         <% } %>
+
+        <% if (phase.steps && phase.steps.length) { %>
+          <div class="resource-block">
+            <h3>Step-by-step plan</h3>
+            <ul class="phase-list">
+              <% phase.steps.forEach((step) => { %>
+                <li><%= step %></li>
+              <% }); %>
+            </ul>
+          </div>
+        <% } %>
+
+        <% if (phase.deliverables && phase.deliverables.length) { %>
+          <div class="resource-block">
+            <h3>Expected deliverables</h3>
+            <ul class="phase-list">
+              <% phase.deliverables.forEach((deliverable) => { %>
+                <li><%= deliverable %></li>
+              <% }); %>
+            </ul>
+          </div>
+        <% } %>
+
+        <% if (phase.practiceAssignments && phase.practiceAssignments.length) { %>
+          <div class="resource-block">
+            <h3>Practice assignments</h3>
+            <ul class="phase-list">
+              <% phase.practiceAssignments.forEach((assignment) => { %>
+                <li><%= assignment %></li>
+              <% }); %>
+            </ul>
+          </div>
+        <% } %>
+
+        <% if (phase.projectRecommendations && phase.projectRecommendations.length) { %>
+          <div class="resource-block">
+            <h3>Project recommendations</h3>
+            <ul class="phase-list">
+              <% phase.projectRecommendations.forEach((project) => { %>
+                <li><%= project %></li>
+              <% }); %>
+            </ul>
+          </div>
+        <% } %>
+
       </article>
     <% }); %>
 

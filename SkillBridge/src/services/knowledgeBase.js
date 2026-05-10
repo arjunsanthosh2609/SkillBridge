@@ -1,23 +1,11 @@
-const fs = require("fs/promises");
-const path = require("path");
-
 const {
   upsertKnowledgeDocument,
-  getAllKnowledgeDocuments
+  deleteKnowledgeDocumentsByUserId,
+  getKnowledgeDocumentsByUserId
 } = require("../db");
-
-const DATA_DIR = path.join(__dirname, "..", "..", "data", "knowledge-base");
-const JOB_IMPORT_DIR = path.join(__dirname, "..", "..", "data", "job-imports");
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
-}
-
-function tokenize(value) {
-  return normalizeText(value)
-    .split(/[^a-z0-9.+#/-]+/i)
-    .map((token) => token.trim())
-    .filter((token) => token.length > 1);
 }
 
 function normalizeRole(goal) {
@@ -37,168 +25,156 @@ function normalizeRole(goal) {
   return goalText || "general";
 }
 
-function rankDocuments(documents, { goal, skills, limit, type }) {
-  const goalRole = normalizeRole(goal);
-  const queryTokens = new Set([
-    ...tokenize(goal),
-    ...skills.flatMap((skill) => tokenize(skill))
-  ]);
-
-  const ranked = documents
-    .filter((document) => !type || document.doc_type === type)
-    .map((document) => {
-      const skillsList = JSON.parse(document.skills_json || "[]");
-      const tagsList = JSON.parse(document.tags_json || "[]");
-      const haystack = tokenize([
-        document.title,
-        document.summary,
-        document.role_target,
-        skillsList.join(" "),
-        tagsList.join(" ")
-      ].join(" "));
-
-      const tokenSet = new Set(haystack);
-      let score = 0;
-
-      queryTokens.forEach((token) => {
-        if (tokenSet.has(token)) {
-          score += 3;
-        }
-      });
-
-      if (normalizeRole(document.role_target || "") === goalRole) {
-        score += 8;
-      }
-
-      if (type === "job_requirement") {
-        score += 2;
-      }
-
-      return {
-        ...document,
-        parsedSkills: skillsList,
-        parsedTags: tagsList,
-        score
-      };
-    })
-    .filter((document) => document.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
-
-  if (ranked.length) {
-    return ranked;
-  }
-
-  return documents
-    .filter((document) => !type || document.doc_type === type)
-    .map((document) => ({
-      ...document,
-      parsedSkills: JSON.parse(document.skills_json || "[]"),
-      parsedTags: JSON.parse(document.tags_json || "[]"),
-      score: 0
-    }))
-    .slice(0, limit);
+async function initializeKnowledgeBase() {
+  return;
 }
 
-async function readJsonFile(filePath) {
-  const raw = await fs.readFile(filePath, "utf8");
-  return JSON.parse(raw);
-}
+function buildUserKnowledgeDocuments({ userId, userName, goal, resumeData }) {
+  const roleTarget = normalizeRole(goal);
+  const skills = Array.isArray(resumeData.skills)
+    ? resumeData.skills.map((skill) => typeof skill === "string" ? skill : skill.skill || skill.matched || "").filter(Boolean)
+    : [];
 
-async function seedKnowledgeBaseFromFiles() {
-  const fileNames = [
-    "learning-resources.json",
-    "public-datasets.json"
+  const sections = [
+    {
+      docType: "user_profile",
+      title: `${userName || "User"} skill profile`,
+      summary: skills.length ? `Current resume skills: ${skills.join(", ")}.` : "Resume skill profile extracted from the user's resume.",
+      tags: ["user-profile", "resume", "skills"],
+      sectionItems: skills
+    },
+    {
+      docType: "user_projects",
+      title: `${userName || "User"} projects`,
+      summary: resumeData.projects && resumeData.projects.length
+        ? `Projects extracted from the resume: ${resumeData.projects.slice(0, 4).join("; ")}.`
+        : "Projects extracted from the user's resume.",
+      tags: ["user-profile", "resume", "projects"],
+      sectionItems: resumeData.projects || []
+    },
+    {
+      docType: "user_experience",
+      title: `${userName || "User"} work experience`,
+      summary: resumeData.experience && resumeData.experience.length
+        ? `Work experience extracted from the resume: ${resumeData.experience.slice(0, 4).join("; ")}.`
+        : "Work experience extracted from the user's resume.",
+      tags: ["user-profile", "resume", "experience"],
+      sectionItems: resumeData.experience || []
+    },
+    {
+      docType: "user_education",
+      title: `${userName || "User"} education`,
+      summary: resumeData.education && resumeData.education.length
+        ? `Education extracted from the resume: ${resumeData.education.slice(0, 4).join("; ")}.`
+        : "Education extracted from the user's resume.",
+      tags: ["user-profile", "resume", "education"],
+      sectionItems: resumeData.education || []
+    },
+    {
+      docType: "user_certifications",
+      title: `${userName || "User"} certifications`,
+      summary: resumeData.certifications && resumeData.certifications.length
+        ? `Certifications extracted from the resume: ${resumeData.certifications.slice(0, 4).join("; ")}.`
+        : "Certifications extracted from the user's resume.",
+      tags: ["user-profile", "resume", "certifications"],
+      sectionItems: resumeData.certifications || []
+    },
+    {
+      docType: "user_courses",
+      title: `${userName || "User"} courses`,
+      summary: resumeData.courses && resumeData.courses.length
+        ? `Courses extracted from the resume: ${resumeData.courses.slice(0, 4).join("; ")}.`
+        : "Courses extracted from the user's resume.",
+      tags: ["user-profile", "resume", "courses"],
+      sectionItems: resumeData.courses || []
+    },
+    {
+      docType: "user_achievements",
+      title: `${userName || "User"} achievements`,
+      summary: resumeData.achievements && resumeData.achievements.length
+        ? `Achievements extracted from the resume: ${resumeData.achievements.slice(0, 4).join("; ")}.`
+        : "Achievements extracted from the user's resume.",
+      tags: ["user-profile", "resume", "achievements"],
+      sectionItems: resumeData.achievements || []
+    }
   ];
 
-  for (const fileName of fileNames) {
-    const items = await readJsonFile(path.join(DATA_DIR, fileName));
-    for (const item of items) {
-      await upsertKnowledgeDocument(item);
+  return sections.map((section) => ({
+    ownerUserId: userId,
+    docType: section.docType,
+    provider: "SkillBridge Resume Parser",
+    title: section.title,
+    sourceUrl: `skillbridge://user/${userId}/${section.docType}`,
+    roleTarget,
+    summary: section.summary,
+    skills,
+    tags: section.tags,
+    metadata: {
+      sourceType: "user-resume",
+      userId,
+      userName: userName || "",
+      goal: goal || "",
+      items: section.sectionItems
     }
-  }
+  }));
 }
 
-async function importJobDocuments() {
-  try {
-    const fileNames = await fs.readdir(JOB_IMPORT_DIR);
-    const jsonFiles = fileNames.filter((fileName) => fileName.endsWith(".json") && !fileName.startsWith("sample-"));
-
-    for (const fileName of jsonFiles) {
-      const items = await readJsonFile(path.join(JOB_IMPORT_DIR, fileName));
-      for (const item of items) {
-        await upsertKnowledgeDocument({
-          docType: "job_requirement",
-          provider: item.provider,
-          title: item.title,
-          sourceUrl: item.sourceUrl,
-          roleTarget: item.roleTarget,
-          summary: item.summary,
-          skills: item.skills || [],
-          tags: item.tags || [],
-          metadata: {
-            location: item.location || "",
-            company: item.company || "",
-            sourceType: "job-board-import"
-          }
-        });
-      }
-    }
-  } catch (_error) {
+async function syncUserKnowledgeBase({ userId, userName, goal, resumeData }) {
+  if (!userId || !resumeData) {
     return;
   }
+
+  await deleteKnowledgeDocumentsByUserId(userId);
+  const documents = buildUserKnowledgeDocuments({ userId, userName, goal, resumeData });
+
+  for (const document of documents) {
+    await upsertKnowledgeDocument(document);
+  }
 }
 
-async function initializeKnowledgeBase() {
-  await seedKnowledgeBaseFromFiles();
-  await importJobDocuments();
-}
-
-function toKnowledgeItem(document) {
-  return {
-    title: document.title,
-    provider: document.provider,
-    sourceUrl: document.source_url,
-    roleTarget: document.role_target || "",
-    summary: document.summary,
-    skills: document.parsedSkills || JSON.parse(document.skills_json || "[]"),
-    tags: document.parsedTags || JSON.parse(document.tags_json || "[]")
+function buildUserProfile(userDocuments) {
+  const sectionMap = {
+    user_profile: "skills",
+    user_projects: "projects",
+    user_experience: "experience",
+    user_education: "education",
+    user_certifications: "certifications",
+    user_courses: "courses",
+    user_achievements: "achievements"
   };
+
+  const profile = {
+    skills: [],
+    projects: [],
+    experience: [],
+    education: [],
+    certifications: [],
+    courses: [],
+    achievements: []
+  };
+
+  for (const document of userDocuments) {
+    const sectionName = sectionMap[document.doc_type];
+    if (!sectionName) continue;
+
+    const metadata = JSON.parse(document.metadata_json || "{}");
+    const items = Array.isArray(metadata.items) ? metadata.items : [];
+    profile[sectionName] = items.map((item) => String(item || "").trim()).filter(Boolean);
+  }
+
+  return profile;
 }
 
-async function retrieveKnowledgeContext({ goal, skills }) {
-  const documents = await getAllKnowledgeDocuments();
-  const normalizedSkills = Array.isArray(skills) ? skills.map((skill) => String(skill).trim()).filter(Boolean) : [];
-
-  const jobRequirements = rankDocuments(documents, {
-    goal,
-    skills: normalizedSkills,
-    type: "job_requirement",
-    limit: 4
-  }).map(toKnowledgeItem);
-
-  const learningResources = rankDocuments(documents, {
-    goal,
-    skills: normalizedSkills,
-    type: "learning_resource",
-    limit: 6
-  }).map(toKnowledgeItem);
-
-  const datasets = rankDocuments(documents, {
-    goal,
-    skills: normalizedSkills,
-    type: "public_dataset",
-    limit: 4
-  }).map(toKnowledgeItem);
+async function retrieveKnowledgeContext({ userId }) {
+  const userDocuments = userId ? await getKnowledgeDocumentsByUserId(userId) : [];
 
   return {
-    jobRequirements,
-    learningResources,
-    datasets
+    userProfile: buildUserProfile(userDocuments)
   };
 }
 
 module.exports = {
   initializeKnowledgeBase,
+  syncUserKnowledgeBase,
   retrieveKnowledgeContext
 };

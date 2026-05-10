@@ -3,6 +3,51 @@ const { GoogleGenAI } = require("@google/genai");
 const client = process.env.GEMINI_API_KEY
   ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
   : null;
+const MODEL_CACHE = new Map();
+const DEFAULT_MODEL_TIMEOUT_MS = 8000;
+
+function stableSerialize(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableSerialize(item)).join(",")}]`;
+  }
+
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableSerialize(value[key])}`).join(",")}}`;
+  }
+
+  return JSON.stringify(value);
+}
+
+function readCachedValue(cacheKey) {
+  if (!cacheKey) {
+    return null;
+  }
+
+  const cached = MODEL_CACHE.get(cacheKey);
+  if (!cached) {
+    return null;
+  }
+
+  if (cached.expiresAt <= Date.now()) {
+    MODEL_CACHE.delete(cacheKey);
+    return null;
+  }
+
+  return cached.value;
+}
+
+function writeCachedValue(cacheKey, value, ttlMs) {
+  if (!cacheKey || !ttlMs) {
+    return value;
+  }
+
+  MODEL_CACHE.set(cacheKey, {
+    value,
+    expiresAt: Date.now() + ttlMs
+  });
+
+  return value;
+}
 
 function normalizeSkills(skills) {
   if (!Array.isArray(skills)) {
@@ -24,21 +69,32 @@ function normalizeSkills(skills) {
     .filter(Boolean);
 }
 
-async function requestJsonFromModel(prompt, fallbackData) {
+async function requestJsonFromModel(prompt, fallbackData, options = {}) {
+  const { cacheKey, ttlMs = 0, timeoutMs = DEFAULT_MODEL_TIMEOUT_MS, forceRefresh = false } = options;
+  if (!forceRefresh) {
+    const cached = readCachedValue(cacheKey);
+    if (cached) {
+      return cached;
+    }
+  }
+
   if (!client) {
     return fallbackData;
   }
 
   try {
-    const response = await client.models.generateContent({
-      model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json"
-      }
-    });
+    const response = await Promise.race([
+      client.models.generateContent({
+        model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json"
+        }
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Model request timed out")), timeoutMs))
+    ]);
 
-    return JSON.parse(response.text);
+    return writeCachedValue(cacheKey, JSON.parse(response.text), ttlMs);
   } catch (_error) {
     return fallbackData;
   }
@@ -524,110 +580,674 @@ function buildFallbackTrends(goal, skills) {
   return common.slice(0, 5);
 }
 
-function buildFallbackExam(goal, skills) {
-  const anchorSkill = skills[0] || "general problem solving";
+function getGoalExamProfile(goal) {
+  const goalText = String(goal || "").toLowerCase();
+
+  if (goalText.includes("frontend")) {
+    return [
+      {
+        question: "In React, when rendering a dynamic list, why is a stable `key` prop important?",
+        options: [
+          "It helps React track item identity and update the DOM efficiently.",
+          "It forces the component to render only once.",
+          "It automatically optimizes every API call.",
+          "It encrypts props before rendering."
+        ],
+        correctOption: 0
+      },
+      {
+        question: "Which CSS layout system is usually the best choice for arranging cards across both rows and columns in a dashboard?",
+        options: [
+          "CSS Grid",
+          "Float-based layout",
+          "Table tags for page layout",
+          "Absolute positioning for every block"
+        ],
+        correctOption: 0
+      },
+      {
+        question: "Why is debouncing useful for a search box that queries an API as the user types?",
+        options: [
+          "It reduces unnecessary requests by waiting briefly for typing to pause.",
+          "It guarantees every request succeeds.",
+          "It caches data permanently in the browser.",
+          "It converts the API into a static file."
+        ],
+        correctOption: 0
+      }
+    ];
+  }
+
+  if (goalText.includes("backend") || goalText.includes("full stack")) {
+    return [
+      {
+        question: "Why should request payloads be validated before business logic runs in an API?",
+        options: [
+          "To stop invalid or unsafe input from propagating through the application.",
+          "To remove the need for a database schema.",
+          "To make every endpoint idempotent automatically.",
+          "To avoid sending HTTP status codes."
+        ],
+        correctOption: 0
+      },
+      {
+        question: "Which HTTP status code is the most appropriate after successfully creating a new resource?",
+        options: [
+          "201 Created",
+          "204 No Content",
+          "301 Moved Permanently",
+          "500 Internal Server Error"
+        ],
+        correctOption: 0
+      },
+      {
+        question: "Why are password hashes stored instead of plain passwords?",
+        options: [
+          "Hashes reduce risk if the database is exposed and support safer password checks.",
+          "Hashes make HTTPS unnecessary.",
+          "Hashes allow admins to recover passwords directly.",
+          "Hashes prevent users from resetting passwords."
+        ],
+        correctOption: 0
+      }
+    ];
+  }
+
+  if (goalText.includes("data analyst")) {
+    return [
+      {
+        question: "In SQL, which clause is used to filter grouped results after aggregation?",
+        options: [
+          "HAVING",
+          "WHERE",
+          "ORDER BY",
+          "VALUES"
+        ],
+        correctOption: 0
+      },
+      {
+        question: "Why is correlation not enough to prove causation in an analysis report?",
+        options: [
+          "Because variables can move together without one directly causing the other.",
+          "Because correlation works only in spreadsheets.",
+          "Because causation is measured only with bar charts.",
+          "Because SQL cannot calculate correlation."
+        ],
+        correctOption: 0
+      },
+      {
+        question: "Which comparison is usually more meaningful than raw total sales when evaluating regions of different sizes?",
+        options: [
+          "A normalized metric such as growth rate or sales per customer",
+          "The region with the shortest name",
+          "The dashboard with the most colors",
+          "The number of queries written"
+        ],
+        correctOption: 0
+      }
+    ];
+  }
+
+  if (goalText.includes("data scientist") || goalText.includes("machine learning")) {
+    return [
+      {
+        question: "Why do we evaluate a model on validation or test data instead of only on training data?",
+        options: [
+          "To estimate how well the model generalizes to unseen data.",
+          "To automatically balance the dataset.",
+          "To eliminate the need for feature engineering.",
+          "To force the model to be unbiased."
+        ],
+        correctOption: 0
+      },
+      {
+        question: "What problem is regularization mainly used to reduce?",
+        options: [
+          "Overfitting",
+          "Data loading",
+          "Column naming differences",
+          "Network latency"
+        ],
+        correctOption: 0
+      },
+      {
+        question: "Why can accuracy be misleading on an imbalanced classification dataset?",
+        options: [
+          "A model can score high accuracy while still performing poorly on the minority class.",
+          "Accuracy is only valid for regression.",
+          "Accuracy always decreases after data cleaning.",
+          "Accuracy depends only on training speed."
+        ],
+        correctOption: 0
+      }
+    ];
+  }
+
+  if (goalText.includes("cloud")) {
+    return [
+      {
+        question: "What is the main benefit of infrastructure as code in cloud engineering?",
+        options: [
+          "It makes infrastructure reproducible, reviewable, and version controlled.",
+          "It removes the need for IAM permissions.",
+          "It guarantees no deployment failures.",
+          "It replaces monitoring tools."
+        ],
+        correctOption: 0
+      },
+      {
+        question: "Why are containers useful in deployment workflows?",
+        options: [
+          "They package the application and dependencies consistently across environments.",
+          "They remove the need for any CI/CD system.",
+          "They replace every managed cloud service.",
+          "They permanently store all runtime logs."
+        ],
+        correctOption: 0
+      },
+      {
+        question: "Which security principle most improves cloud access control?",
+        options: [
+          "Least privilege",
+          "Shared admin credentials",
+          "Open inbound ports by default",
+          "Disabling audit trails"
+        ],
+        correctOption: 0
+      }
+    ];
+  }
+
+  if (goalText.includes("security")) {
+    return [
+      {
+        question: "Why is input sanitization important in secure application design?",
+        options: [
+          "It helps reduce attack vectors such as injection vulnerabilities.",
+          "It increases browser refresh speed.",
+          "It removes the need for authentication.",
+          "It eliminates all logging requirements."
+        ],
+        correctOption: 0
+      },
+      {
+        question: "What is the purpose of multi-factor authentication?",
+        options: [
+          "To require more than one type of verification before granting access.",
+          "To encrypt all application source code.",
+          "To replace authorization logic completely.",
+          "To store passwords in plaintext temporarily."
+        ],
+        correctOption: 0
+      },
+      {
+        question: "Which action best supports investigation after a suspicious login attempt?",
+        options: [
+          "Reviewing centralized logs with timestamps, IPs, and account context",
+          "Deleting the affected user record",
+          "Turning off monitoring temporarily",
+          "Changing the frontend theme"
+        ],
+        correctOption: 0
+      }
+    ];
+  }
+
+  if (goalText.includes("ui/ux") || goalText.includes("design")) {
+    return [
+      {
+        question: "Why is visual hierarchy important in a product interface?",
+        options: [
+          "It guides users toward the most important information and actions.",
+          "It removes the need for usability testing.",
+          "It guarantees accessibility compliance automatically.",
+          "It makes every layout symmetrical."
+        ],
+        correctOption: 0
+      },
+      {
+        question: "What is the main value of a reusable component system in design work?",
+        options: [
+          "It improves consistency and speeds up iteration across screens.",
+          "It eliminates the need for research.",
+          "It replaces product requirements.",
+          "It prevents design updates later."
+        ],
+        correctOption: 0
+      },
+      {
+        question: "Which practice most directly supports accessible color usage?",
+        options: [
+          "Checking contrast between foreground and background elements",
+          "Using more gradients",
+          "Avoiding text labels when icons exist",
+          "Choosing colors only by personal taste"
+        ],
+        correctOption: 0
+      }
+    ];
+  }
 
   return [
     {
-      question: `Which option best describes the main purpose of ${anchorSkill} in a ${goal} workflow?`,
+      question: "Which answer best demonstrates practical ownership of a technical skill?",
       options: [
-        "It helps deliver or improve core work in the target role.",
-        "It is used only for graphic design.",
-        "It replaces collaboration entirely.",
-        "It removes the need for testing."
+        "Explaining how it was used in a real task, project, or measurable outcome",
+        "Repeating the keyword without context",
+        "Listing it multiple times in the resume",
+        "Avoiding implementation details entirely"
       ],
       correctOption: 0
     },
     {
-      question: `When reviewing a resume for ${goal}, what is the best way to validate claimed skill strength?`,
+      question: "Why is breaking a technical learning goal into milestones useful?",
       options: [
-        "Ask only theoretical questions.",
-        "Ignore the resume and ask unrelated puzzles.",
-        "Use goal-based practical questions tied to listed skills.",
-        "Skip evaluation if the candidate sounds confident."
-      ],
-      correctOption: 2
-    },
-    {
-      question: `What would most strongly show working knowledge beyond just listing ${anchorSkill} on a resume?`,
-      options: [
-        "A project, deliverable, or measurable outcome using it.",
-        "Writing it in uppercase letters.",
-        "Mentioning it more than five times.",
-        "Leaving dates off the resume."
-      ],
-      correctOption: 0
-    },
-    {
-      question: `For someone aiming to become a ${goal}, what is usually the best next step after identifying a skill gap?`,
-      options: [
-        "Avoid practicing until more trends appear.",
-        "Create a focused learning plan with projects and milestones.",
-        "Remove the goal from the profile.",
-        "Learn unrelated tools first."
-      ],
-      correctOption: 1
-    },
-    {
-      question: "Which answer best reflects exam evidence that matches the submitted resume skills?",
-      options: [
-        "Responses that connect concepts to tools and practical use cases.",
-        "Very short guesses with no explanation.",
-        "Answers unrelated to the selected goal.",
-        "Skipping questions that mention listed skills."
+        "It makes progress measurable and helps target specific gaps.",
+        "It removes the need for practice.",
+        "It guarantees success in every interview.",
+        "It replaces feedback from peers and users."
       ],
       correctOption: 0
     }
   ];
 }
 
+const SKILL_EXAM_BANK = {
+  javascript: {
+    question: "What is the main difference between `==` and `===` in JavaScript?",
+    options: [
+      "`===` checks both value and type, while `==` can coerce types.",
+      "`==` is always safer for APIs.",
+      "`===` works only for strings.",
+      "`==` is used only for objects."
+    ],
+    correctOption: 0
+  },
+  typescript: {
+    question: "What is a major benefit of TypeScript in a growing codebase?",
+    options: [
+      "Static typing helps catch interface and data-shape issues earlier.",
+      "It removes the need for runtime testing.",
+      "It runs without any compilation in all browsers.",
+      "It guarantees zero production bugs."
+    ],
+    correctOption: 0
+  },
+  react: {
+    question: "Why should state updates in React usually be immutable?",
+    options: [
+      "Immutable updates make changes easier to detect and rerender predictably.",
+      "React only supports string state values.",
+      "Mutable state is required for hooks to work.",
+      "It prevents JSX compilation errors."
+    ],
+    correctOption: 0
+  },
+  node: {
+    question: "Why is non-blocking I/O important in Node.js applications?",
+    options: [
+      "It allows the server to continue handling other work while waiting on slower operations.",
+      "It forces all code to run synchronously.",
+      "It removes the need for databases.",
+      "It stores all requests permanently in memory."
+    ],
+    correctOption: 0
+  },
+  express: {
+    question: "What is Express middleware primarily used for?",
+    options: [
+      "Running request pipeline logic such as auth, validation, logging, or error handling",
+      "Rendering database tables in the browser",
+      "Replacing all route handlers",
+      "Compiling frontend assets automatically"
+    ],
+    correctOption: 0
+  },
+  sql: {
+    question: "Which SQL operation is best for combining rows from related tables?",
+    options: [
+      "JOIN",
+      "DROP",
+      "TRUNCATE",
+      "CAST"
+    ],
+    correctOption: 0
+  },
+  python: {
+    question: "Why are virtual environments commonly used in Python projects?",
+    options: [
+      "They isolate project dependencies and reduce version conflicts.",
+      "They compile Python into SQL.",
+      "They make code run only on Linux.",
+      "They replace package managers entirely."
+    ],
+    correctOption: 0
+  },
+  java: {
+    question: "What is one core benefit of object-oriented design in Java?",
+    options: [
+      "It supports encapsulation and reusable abstractions around behavior and data.",
+      "It removes the need for compilation.",
+      "It guarantees lower memory usage than all other languages.",
+      "It makes exception handling unnecessary."
+    ],
+    correctOption: 0
+  },
+  aws: {
+    question: "Why might a team serve a static frontend from object storage plus a CDN on AWS?",
+    options: [
+      "To deliver content reliably and efficiently with caching near users.",
+      "To replace the need for DNS.",
+      "To turn every request into a database query.",
+      "To avoid writing HTML and CSS."
+    ],
+    correctOption: 0
+  },
+  docker: {
+    question: "What is the practical value of a Docker image?",
+    options: [
+      "It packages the app and runtime dependencies into a portable artifact.",
+      "It permanently stores application logs.",
+      "It replaces all CI pipelines.",
+      "It is identical to a virtual machine."
+    ],
+    correctOption: 0
+  },
+  kubernetes: {
+    question: "What problem does Kubernetes primarily solve?",
+    options: [
+      "Managing, scaling, and orchestrating containerized workloads",
+      "Writing CSS layouts",
+      "Replacing version control branching",
+      "Parsing PDF resumes"
+    ],
+    correctOption: 0
+  },
+  git: {
+    question: "Why are small, focused Git commits usually better than large mixed commits?",
+    options: [
+      "They are easier to review, understand, and revert safely.",
+      "They remove merge conflicts completely.",
+      "They make version control optional.",
+      "They prevent teammates from reading code."
+    ],
+    correctOption: 0
+  },
+  figma: {
+    question: "Why are reusable components useful in Figma workflows?",
+    options: [
+      "They improve consistency and make iterative updates easier.",
+      "They generate backend endpoints.",
+      "They replace typography systems.",
+      "They prevent layout changes."
+    ],
+    correctOption: 0
+  },
+  powerbi: {
+    question: "Why are table relationships important in a Power BI data model?",
+    options: [
+      "They allow filters and measures to work correctly across related data.",
+      "They only affect dashboard colors.",
+      "They remove the need for data cleaning.",
+      "They matter only when exporting to PDF."
+    ],
+    correctOption: 0
+  },
+  ml: {
+    question: "What is feature engineering in machine learning?",
+    options: [
+      "Transforming raw data into inputs that help models learn useful patterns",
+      "Deleting low-value rows permanently",
+      "Deploying the model to production",
+      "Writing frontend code for experiments"
+    ],
+    correctOption: 0
+  },
+  nlp: {
+    question: "In NLP, what is tokenization?",
+    options: [
+      "Breaking text into smaller units such as words or subwords for processing",
+      "Encrypting all text before analysis",
+      "Turning text directly into charts",
+      "Converting text into image pixels"
+    ],
+    correctOption: 0
+  }
+};
+
+function buildFallbackExam(goal, skills) {
+  const normalizedSkills = normalizeSkills(skills);
+  const anchorSkill = normalizedSkills[0] || "your strongest listed skill";
+  const goalQuestions = getGoalExamProfile(goal);
+  const skillQuestions = normalizedSkills
+    .map((skill) => SKILL_EXAM_BANK[String(skill).toLowerCase()])
+    .filter(Boolean);
+
+  const genericQuestions = [
+    {
+      question: `When claiming ${anchorSkill} on a resume for a ${goal} role, what is the strongest proof of real working knowledge?`,
+      options: [
+        "Describing a real implementation, tradeoff, debugging step, or measurable result using that skill",
+        "Mentioning the tool repeatedly in the summary",
+        "Avoiding implementation details to stay brief",
+        "Listing it without any project context"
+      ],
+      correctOption: 0
+    },
+    {
+      question: `For a ${goal} candidate, what is the best response after an assessment exposes a skill gap?`,
+      options: [
+        "Create a focused practice plan with targeted projects and milestones for that gap.",
+        "Delete the skill from the resume and ignore it.",
+        "Study only buzzwords related to the role.",
+        "Switch to unrelated tools immediately."
+      ],
+      correctOption: 0
+    }
+  ];
+
+  const seen = new Set();
+  return [...goalQuestions, ...skillQuestions, ...genericQuestions].filter((question) => {
+    if (seen.has(question.question)) {
+      return false;
+    }
+    seen.add(question.question);
+    return true;
+  }).slice(0, 8);
+}
+
 function buildFallbackRoadmap({ goal, skills, skillLevel, score }) {
   return {
     headline: `${goal} growth roadmap for a ${skillLevel.toLowerCase()} learner`,
     summary: `Your resume shows ${skills.length ? skills.join(", ") : "emerging skills"}, and your assessment score is ${score}%. This roadmap prioritizes closing the highest-impact gaps first.`,
+    answers: {
+      whereAmINow: `You are currently at a ${skillLevel.toLowerCase()} level for ${goal}. Your current profile shows ${skills.length ? skills.join(", ") : "early-stage skills"}, and your assessment score is ${score}%.`,
+      whatAmIMissing: `You are missing stronger proof of applied ability, deeper role-specific fundamentals, and clearer project evidence for ${goal}.`,
+      whatShouldILearnNext: `You should next learn the highest-impact missing concepts for ${goal}, then convert them into one or two practical projects.`,
+      whyShouldILearnIt: `You should learn these areas because they close the gap between what your resume claims and what employers expect you to demonstrate in real work.`,
+      howShouldILearnIt: "Learn through a mix of short focused study, hands-on exercises, one guided project, resume improvement, and mock interview practice.",
+      whenAmIJobReady: "You are job-ready when you can explain your core skills confidently, complete a role-aligned project independently, show evidence in your resume, and answer common technical questions with real examples."
+    },
     phases: [
       {
-        title: "Phase 1: Strengthen foundations",
-        duration: "Weeks 1-3",
+        title: "Phase 1: Assess and strengthen foundations",
+        duration: "Weeks 1-2",
+        objective: `Build a reliable base in the core concepts expected from a ${goal}.`,
         actions: [
-          `Revisit the core concepts required for ${goal}.`,
-          "Practice your current resume skills in short daily exercises.",
-          "Document one mini project to prove understanding."
+          `Review the most important concepts required for ${goal} and compare them with your current resume skills.`,
+          "Create a short list of weak topics based on your exam mistakes and resume gaps.",
+          "Practice one small exercise every day on your weakest fundamentals."
+        ],
+        steps: [
+          "Step 1: List the tools, concepts, and workflows already present in your resume.",
+          "Step 2: Compare those with the skills expected for your target role.",
+          "Step 3: Pick 2-3 weak areas and study them with short daily sessions.",
+          "Step 4: Build one mini exercise or toy example to prove each topic is understood.",
+          "Step 5: Write short notes on what you learned and what still feels unclear."
+        ],
+        deliverables: [
+          "A list of priority gaps",
+          "Mini practice exercises",
+          "Short revision notes"
+        ],
+        practiceAssignments: [
+          "Complete 3 short exercises on your weakest fundamentals.",
+          "Write one-page notes for each weak concept you review.",
+          "Solve one debugging or implementation task using your current core skills."
+        ],
+        projectRecommendations: [
+          "Build a tiny proof-of-concept that demonstrates one core skill from your target role.",
+          "Create a mini practice project focused on a single weak topic."
         ]
       },
       {
-        title: "Phase 2: Close the gap",
-        duration: "Weeks 4-8",
+        title: "Phase 2: Build practical capability",
+        duration: "Weeks 3-5",
+        objective: "Turn weak or theoretical skills into hands-on experience through guided practice.",
         actions: [
-          "Study two trending skills that align with your role target.",
-          "Build one portfolio project that combines existing and missing skills.",
-          "Review mistakes from the exam and turn them into learning checkpoints."
+          "Study the missing concepts that most directly affect your target role.",
+          "Build one focused project that combines your current strengths with one or two missing skills.",
+          "Use each project task as a checkpoint to validate real understanding."
+        ],
+        steps: [
+          "Step 1: Choose one project idea that matches your career goal and current level.",
+          "Step 2: Break the project into small tasks such as setup, core feature, testing, and polishing.",
+          "Step 3: Apply one missing skill in each task instead of trying to learn everything at once.",
+          "Step 4: Track blockers, debugging decisions, and lessons learned while building.",
+          "Step 5: Finish the project with a working demo, screenshots, or code repository."
+        ],
+        deliverables: [
+          "One role-aligned practice project",
+          "Documented implementation notes",
+          "Proof of applied skill usage"
+        ],
+        practiceAssignments: [
+          "Break the chosen project into 5-7 small implementation tasks and complete them one by one.",
+          "Write a short daily log of blockers, fixes, and lessons learned.",
+          "Rebuild one feature twice: once simply, and once with an improvement."
+        ],
+        projectRecommendations: [
+          `Build one portfolio-ready ${goal} project that uses both your current strengths and one missing skill.`,
+          "Choose a project that solves a real problem and can be demonstrated clearly."
         ]
       },
       {
-        title: "Phase 3: Become interview-ready",
-        duration: "Weeks 9-12",
+        title: "Phase 3: Strengthen profile and portfolio",
+        duration: "Weeks 6-8",
+        objective: "Improve how your work is presented so your profile clearly reflects real capability.",
         actions: [
-          "Refine project explanations using metrics and outcomes.",
-          "Practice role-specific mock questions weekly.",
-          "Update your resume and profile with the new evidence of skill growth."
+          "Refine your project descriptions using outcomes, responsibilities, and concrete tools.",
+          "Update your resume with better evidence for skills, projects, and achievements.",
+          "Add missing certifications, coursework, or achievements that support your goal."
+        ],
+        steps: [
+          "Step 1: Rewrite project bullet points using action + tool + result structure.",
+          "Step 2: Add the strongest work from Phase 2 into your resume and profile.",
+          "Step 3: Organize certifications, courses, and achievements so they support your target role.",
+          "Step 4: Remove weak or repetitive resume points that do not help your goal.",
+          "Step 5: Ask whether each section gives proof, not just claims."
+        ],
+        deliverables: [
+          "Updated resume",
+          "Stronger project descriptions",
+          "Cleaner supporting profile details"
+        ],
+        practiceAssignments: [
+          "Rewrite at least 5 resume bullet points using action + tool + outcome format.",
+          "Create a portfolio summary for your strongest project.",
+          "Review whether each listed skill has matching project evidence."
+        ],
+        projectRecommendations: [
+          "Polish your strongest project with better documentation, visuals, and outcomes.",
+          "Add one small extension feature to an existing project to show growth."
+        ]
+      },
+      {
+        title: "Phase 4: Prepare for interviews and next steps",
+        duration: "Weeks 9-10",
+        objective: "Convert your improved skills and projects into interview readiness and a repeatable growth plan.",
+        actions: [
+          "Practice technical questions tied to your goal and resume skills.",
+          "Review common role-specific scenarios, tradeoffs, and debugging questions.",
+          "Create a next-step plan for continued growth after the roadmap."
+        ],
+        steps: [
+          "Step 1: Practice answering technical questions using examples from your own projects.",
+          "Step 2: Review weak areas from the exam again and retest yourself.",
+          "Step 3: Prepare concise explanations for your tools, architecture decisions, and learning progress.",
+          "Step 4: Identify the next 1-2 advanced skills to learn after this roadmap.",
+          "Step 5: Set a weekly practice schedule you can continue beyond the current plan."
+        ],
+        deliverables: [
+          "Mock interview answers",
+          "Role-specific revision checklist",
+          "Post-roadmap learning plan"
+        ],
+        practiceAssignments: [
+          "Answer 10 role-specific interview questions using examples from your own work.",
+          "Do one timed mock session each week covering concepts and project walkthroughs.",
+          "Create a final checklist of concepts, projects, and examples you can explain confidently."
+        ],
+        projectRecommendations: [
+          "Prepare one showcase project to discuss deeply in interviews.",
+          "Identify one next-level project idea to continue after you become job-ready."
         ]
       }
     ]
   };
 }
 
+function normalizeRoadmapPhase(phase, index) {
+  const actions = Array.isArray(phase.actions) ? phase.actions.filter(Boolean) : [];
+  const steps = Array.isArray(phase.steps) ? phase.steps.filter(Boolean) : actions.map((action, actionIndex) => `Step ${actionIndex + 1}: ${action}`);
+  const deliverables = Array.isArray(phase.deliverables) ? phase.deliverables.filter(Boolean) : [];
+  const practiceAssignments = Array.isArray(phase.practiceAssignments) ? phase.practiceAssignments.filter(Boolean) : [];
+  const projectRecommendations = Array.isArray(phase.projectRecommendations) ? phase.projectRecommendations.filter(Boolean) : [];
+
+  return {
+    title: String(phase.title || `Phase ${index + 1}`).trim(),
+    duration: String(phase.duration || "").trim(),
+    objective: String(phase.objective || "").trim(),
+    actions,
+    steps,
+    deliverables,
+    practiceAssignments,
+    projectRecommendations,
+    resources: Array.isArray(phase.resources) ? phase.resources : []
+  };
+}
+
+function normalizeRoadmapShape(roadmap) {
+  return {
+    headline: String(roadmap.headline || "Personalized roadmap").trim(),
+    summary: String(roadmap.summary || "").trim(),
+    answers: {
+      whereAmINow: String(roadmap.answers?.whereAmINow || "").trim(),
+      whatAmIMissing: String(roadmap.answers?.whatAmIMissing || "").trim(),
+      whatShouldILearnNext: String(roadmap.answers?.whatShouldILearnNext || "").trim(),
+      whyShouldILearnIt: String(roadmap.answers?.whyShouldILearnIt || "").trim(),
+      howShouldILearnIt: String(roadmap.answers?.howShouldILearnIt || "").trim(),
+      whenAmIJobReady: String(roadmap.answers?.whenAmIJobReady || "").trim()
+    },
+    phases: Array.isArray(roadmap.phases) ? roadmap.phases.map(normalizeRoadmapPhase) : []
+  };
+}
+
 function buildFallbackKnowledgeContext(knowledgeContext) {
   const normalized = {
-    jobRequirements: normalizeKnowledgeItems(knowledgeContext.jobRequirements),
-    learningResources: normalizeKnowledgeItems(knowledgeContext.learningResources),
-    datasets: normalizeKnowledgeItems(knowledgeContext.datasets)
+    userProfile: {
+      skills: normalizeSkills(knowledgeContext.userProfile?.skills || []),
+      projects: normalizeSkills(knowledgeContext.userProfile?.projects || []),
+      experience: normalizeSkills(knowledgeContext.userProfile?.experience || []),
+      education: normalizeSkills(knowledgeContext.userProfile?.education || []),
+      certifications: normalizeSkills(knowledgeContext.userProfile?.certifications || []),
+      courses: normalizeSkills(knowledgeContext.userProfile?.courses || []),
+      achievements: normalizeSkills(knowledgeContext.userProfile?.achievements || [])
+    }
   };
 
   return {
-    jobRequirements: normalized.jobRequirements.slice(0, 3),
-    learningResources: normalized.learningResources.slice(0, 6),
-    datasets: normalized.datasets.slice(0, 3)
+    userProfile: normalized.userProfile
   };
 }
 
@@ -641,7 +1261,10 @@ Role goal: ${goal}
 Current user skills: ${normalizedSkills.join(", ")}
 Focus on future trending skills that are timely for the role and complement the current skills.
 `;
-  const result = await requestJsonFromModel(prompt, { skills: fallback });
+  const result = await requestJsonFromModel(prompt, { skills: fallback }, {
+    cacheKey: `trending:${stableSerialize({ goal, skills: normalizedSkills })}`,
+    ttlMs: 1000 * 60 * 60 * 6
+  });
   return result.skills || fallback;
 }
 
@@ -649,20 +1272,28 @@ async function generateExam({ goal, skills }) {
   const normalizedSkills = normalizeSkills(skills);
   const fallback = buildFallbackExam(goal, normalizedSkills);
   const prompt = `
-Return JSON with a "questions" array of exactly 5 multiple choice questions.
+Return JSON with a "questions" array of exactly ${fallback.length} multiple choice questions.
 Each question must contain:
 - "question"
 - "options" with 4 strings
 - "correctOption" as a zero-based integer
 Role goal: ${goal}
 Resume skills: ${normalizedSkills.join(", ")}
-Make the exam test whether the learner truly understands the resume skills and role expectations.
+Make the exam technical and role-aware.
+Rules:
+- At least half of the questions must directly test one or more listed resume skills.
+- The remaining questions should test practical concepts, debugging, tradeoffs, architecture, or best practices for the target role.
+- Avoid generic motivation or career-advice questions.
+- Keep the difficulty suitable for a serious beginner-to-intermediate candidate.
 `;
-  const result = await requestJsonFromModel(prompt, { questions: fallback });
+  const result = await requestJsonFromModel(prompt, { questions: fallback }, {
+    cacheKey: `exam:${stableSerialize({ goal, skills: normalizedSkills })}`,
+    ttlMs: 1000 * 60 * 30
+  });
   return result.questions || fallback;
 }
 
-async function generateRoadmap({ goal, skills, skillLevel, score, knowledgeContext = {} }) {
+async function generateRoadmap({ goal, skills, skillLevel, score, knowledgeContext = {}, forceRefresh = false }) {
   const normalizedSkills = normalizeSkills(skills);
   const fallback = buildFallbackRoadmap({ goal, skills: normalizedSkills, skillLevel, score });
   const fallbackContext = buildFallbackKnowledgeContext(knowledgeContext);
@@ -670,33 +1301,51 @@ async function generateRoadmap({ goal, skills, skillLevel, score, knowledgeConte
 Return JSON with:
 - "headline"
 - "summary"
-- "phases" array with 3 objects
+- "answers" object with exactly these keys:
+  - "whereAmINow"
+  - "whatAmIMissing"
+  - "whatShouldILearnNext"
+  - "whyShouldILearnIt"
+  - "howShouldILearnIt"
+  - "whenAmIJobReady"
+- "phases" array with 4 objects
 Each phase object must contain:
 - "title"
 - "duration"
+- "objective"
 - "actions" array with 3 strings
-- "objective" string
+- "steps" array with 4 to 6 strings written as a clear step-by-step plan
+- "deliverables" array with 2 to 4 strings
+- "practiceAssignments" array with 2 to 4 concrete assignments
+- "projectRecommendations" array with 1 to 3 concrete project ideas
 Also return:
-- "jobSignals" array of up to 3 objects with "title", "provider", "summary", "sourceUrl"
 - "datasetSuggestions" array of up to 3 objects with "title", "provider", "summary", "sourceUrl"
 Generate a personalized roadmap for this learner.
 Goal: ${goal}
 Resume skills: ${normalizedSkills.join(", ")}
 Assessment level: ${skillLevel}
 Assessment score: ${score}
-Retrieved job requirements:
-${JSON.stringify(fallbackContext.jobRequirements, null, 2)}
-Retrieved learning resources:
-${JSON.stringify(fallbackContext.learningResources, null, 2)}
-Retrieved datasets:
-${JSON.stringify(fallbackContext.datasets, null, 2)}
+Retrieved user knowledge profile:
+${JSON.stringify(fallbackContext.userProfile, null, 2)}
+Rules:
+- Make the roadmap detailed, clear, and practical.
+- The "answers" object must directly answer the user's current position, gaps, next learning priorities, rationale, learning method, and estimated job-readiness state.
+- Each phase should feel sequential and build on the previous phase.
+- The "steps" should be concrete actions, not vague advice.
+- The "practiceAssignments" should feel like tasks the user can complete this week.
+- The "projectRecommendations" should be role-aligned and realistic for the user's level.
+- Use the user's existing skills, projects, education, certifications, courses, and achievements when shaping the plan.
 `;
-  const roadmap = await requestJsonFromModel(prompt, fallback);
-  const enrichedRoadmap = await attachStudyMaterials(roadmap, goal, normalizedSkills, skillLevel, score, fallbackContext);
+  const roadmap = await requestJsonFromModel(prompt, fallback, {
+    cacheKey: `roadmap:${stableSerialize({ goal, skills: normalizedSkills, skillLevel, score, userProfile: fallbackContext.userProfile })}`,
+    ttlMs: 1000 * 60 * 15,
+    forceRefresh
+  });
+  const normalizedRoadmap = normalizeRoadmapShape(roadmap);
+  const enrichedRoadmap = await attachStudyMaterials(normalizedRoadmap, goal, normalizedSkills, skillLevel, score, fallbackContext);
   return {
     ...enrichedRoadmap,
-    jobSignals: Array.isArray(roadmap.jobSignals) && roadmap.jobSignals.length ? roadmap.jobSignals : fallbackContext.jobRequirements,
-    datasetSuggestions: Array.isArray(roadmap.datasetSuggestions) && roadmap.datasetSuggestions.length ? roadmap.datasetSuggestions : fallbackContext.datasets,
+    datasetSuggestions: Array.isArray(roadmap.datasetSuggestions) ? roadmap.datasetSuggestions : [],
     knowledgeBase: fallbackContext
   };
 }
