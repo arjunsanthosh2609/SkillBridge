@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="skillbridge_primary">#0C7C59</color>
+    <color name="skillbridge_primary_dark">#085B42</color>
+    <color name="skillbridge_accent">#EF8354</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+</resources>
