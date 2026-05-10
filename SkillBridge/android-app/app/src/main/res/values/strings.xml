@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SkillBridge</string>
+    <string name="skillbridge_base_url">http://10.112.80.138:3000</string>
+</resources>
