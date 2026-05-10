@@ -28,14 +28,14 @@ const {
   updateResumeText
 } = require("./src/db");
 
-const { extractResumeData } = require("./src/services/resumeParser");
+const { extractResumeData, extractResumeInsightsFromText } = require("./src/services/resumeParser");
 const { getTrendingSkills, generateExam, generateRoadmap } = require("./src/services/llmService");
-const { initializeKnowledgeBase, retrieveKnowledgeContext } = require("./src/services/knowledgeBase");
+const { initializeKnowledgeBase, retrieveKnowledgeContext, syncUserKnowledgeBase } = require("./src/services/knowledgeBase");
 const { analyzeResume } = require("./src/services/suggestionService");
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
-const HOST = '10.112.80.103'; // Use your actual Wi-Fi IP for mobile connectivity
+const HOST = '10.112.80.138'; // Use your actual Wi-Fi IP for mobile connectivity
 const uploadDir = path.join(__dirname, "uploads");
 const REMEMBER_COOKIE = "skillbridge_auth";
 const REMEMBER_DAYS = 30;
@@ -56,7 +56,10 @@ app.set("views", path.join(__dirname, "src", "views"));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public"), {
+  maxAge: "7d",
+  etag: true
+}));
 app.use(session({
   secret: process.env.SESSION_SECRET || "skillbridge-dev-secret",
   resave: false,
@@ -109,6 +112,16 @@ function normalizeResumeSkills(rawSkills) {
     }
     return "";
   }).filter(Boolean);
+}
+
+async function syncKnowledgeFromResume({ userId, userName, goal, resumeText, parsedResumeData, fallbackSkills = [] }) {
+  const resumeData = parsedResumeData || extractResumeInsightsFromText(resumeText || "", fallbackSkills);
+  await syncUserKnowledgeBase({
+    userId,
+    userName,
+    goal,
+    resumeData
+  });
 }
 
 // --- REMEMBER ME COOKIE LOGIC ---
@@ -192,17 +205,22 @@ app.post("/signup", upload.single("resume"), async (req, res) => {
 
         let finalSkills = [];
         let extractedText = "";
+        let parsedResumeData = null;
 
         if (req.file) {
             const data = await extractResumeData(req.file.path, req.file.originalname);
             finalSkills = normalizeResumeSkills(data.skills);
-            extractedText = data.text || "File upload content";
+            extractedText = data.resumeText || data.text || "File upload content";
+            parsedResumeData = data;
         }
 
         if (mobileSkillsRaw) {
             const mSkills = mobileSkillsRaw.split(",").map(s => s.trim()).filter(Boolean);
             finalSkills = [...new Set([...finalSkills, ...mSkills])];
             if (!extractedText) extractedText = "OCR Extraction: " + mobileSkillsRaw;
+            if (!parsedResumeData) {
+              parsedResumeData = extractResumeInsightsFromText(extractedText, mSkills);
+            }
         }
 
         const newUser = await createUser({
@@ -211,6 +229,15 @@ app.post("/signup", upload.single("resume"), async (req, res) => {
             resumeFilename: req.file ? req.file.filename : "mobile-scan.png",
             resumeText: extractedText || "No text available",
             resumeSkills: JSON.stringify(finalSkills)
+        });
+
+        await syncKnowledgeFromResume({
+          userId: newUser.id,
+          userName: newUser.full_name,
+          goal: newUser.goal,
+          resumeText: extractedText,
+          parsedResumeData,
+          fallbackSkills: finalSkills
         });
 
         req.session.userId = newUser.id;
@@ -239,9 +266,11 @@ app.post("/login", async (req, res) => {
 app.get("/home", requireAuth, async (req, res) => {
   const user = await getUserById(req.session.userId);
   const resumeSkills = JSON.parse(user.resume_skills || "[]");
-  const trendingSkills = await getTrendingSkills({ goal: user.goal, skills: resumeSkills });
-  const latestExam = await getLatestExamAttemptByUserId(req.session.userId);
-  const latestRoadmap = await getLatestRoadmapByUserId(req.session.userId);
+  const [trendingSkills, latestExam, latestRoadmap] = await Promise.all([
+    getTrendingSkills({ goal: user.goal, skills: resumeSkills }),
+    getLatestExamAttemptByUserId(req.session.userId),
+    getLatestRoadmapByUserId(req.session.userId)
+  ]);
 
   res.render("home", {
     user,
@@ -332,6 +361,13 @@ app.post("/profile", requireAuth, async (req, res) => {
     });
 
     const user = await getUserById(currentUser.id);
+    await syncKnowledgeFromResume({
+      userId: user.id,
+      userName: user.full_name,
+      goal: user.goal,
+      resumeText: user.resume_text,
+      fallbackSkills: normalizedSkills
+    });
     req.session.resumeSkills = normalizedSkills;
 
     return res.render("profile", {
@@ -417,6 +453,7 @@ app.post("/exam", requireAuth, async (req, res) => {
 });
 
 app.get("/roadmap", requireAuth, async (req, res) => {
+  const forceRefresh = req.query.refresh === "1";
   const latestExamAttempt = await getLatestExamAttemptByUserId(req.session.userId);
   const examResult = formatExamAttempt(latestExamAttempt);
   if (!examResult) {
@@ -425,15 +462,18 @@ app.get("/roadmap", requireAuth, async (req, res) => {
 
   const user = await getUserById(req.session.userId);
   const resumeSkills = normalizeResumeSkills(JSON.parse(user.resume_skills || "[]"));
+  const knowledgeContext = await retrieveKnowledgeContext({
+    userId: req.session.userId,
+    goal: user.goal,
+    skills: resumeSkills
+  });
   const roadmap = await generateRoadmap({
     goal: user.goal,
     skills: resumeSkills,
     skillLevel: examResult.level,
     score: examResult.score,
-    knowledgeContext: await retrieveKnowledgeContext({
-      goal: user.goal,
-      skills: resumeSkills
-    })
+    knowledgeContext,
+    forceRefresh
   });
 
   await saveRoadmap({
@@ -442,7 +482,6 @@ app.get("/roadmap", requireAuth, async (req, res) => {
     summary: roadmap.summary,
     phasesJson: JSON.stringify(roadmap.phases || []),
     contextJson: JSON.stringify({
-      jobSignals: roadmap.jobSignals || [],
       datasetSuggestions: roadmap.datasetSuggestions || [],
       knowledgeBase: roadmap.knowledgeBase || {}
     })
@@ -711,6 +750,14 @@ app.post("/save-edited-resume", requireAuth, async (req, res) => {
         const { editedText } = req.body;
         // USE THE SPECIFIC HELPER INSTEAD OF THE GENERAL updateUser
         await updateResumeText(req.session.userId, editedText);
+        const user = await getUserById(req.session.userId);
+        await syncKnowledgeFromResume({
+          userId: user.id,
+          userName: user.full_name,
+          goal: user.goal,
+          resumeText: editedText,
+          fallbackSkills: normalizeResumeSkills(JSON.parse(user.resume_skills || "[]"))
+        });
         res.json({ success: true });
     } catch (error) {
         console.error("Save Resume Error:", error);

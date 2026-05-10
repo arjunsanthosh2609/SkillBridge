@@ -110,6 +110,7 @@ function initDb() {
     db.run(`
       CREATE TABLE IF NOT EXISTS knowledge_documents (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        owner_user_id INTEGER,
         doc_type TEXT NOT NULL,
         provider TEXT NOT NULL,
         title TEXT NOT NULL,
@@ -127,10 +128,12 @@ function initDb() {
     db.run("CREATE INDEX IF NOT EXISTS idx_kb_doc_type ON knowledge_documents(doc_type)");
     db.run("CREATE INDEX IF NOT EXISTS idx_kb_provider ON knowledge_documents(provider)");
     db.run("CREATE INDEX IF NOT EXISTS idx_kb_role_target ON knowledge_documents(role_target)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_kb_owner_user_id ON knowledge_documents(owner_user_id)");
     db.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_kb_source_url ON knowledge_documents(source_url)");
   });
 
   db.run("ALTER TABLE roadmaps ADD COLUMN context_json TEXT DEFAULT '{}'", () => {});
+  db.run("ALTER TABLE knowledge_documents ADD COLUMN owner_user_id INTEGER", () => {});
 }
 
 async function createUser(user) {
@@ -240,6 +243,7 @@ function upsertKnowledgeDocument(document) {
   return run(
     `
       INSERT INTO knowledge_documents (
+        owner_user_id,
         doc_type,
         provider,
         title,
@@ -251,8 +255,9 @@ function upsertKnowledgeDocument(document) {
         metadata_json,
         updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(source_url) DO UPDATE SET
+        owner_user_id = excluded.owner_user_id,
         doc_type = excluded.doc_type,
         provider = excluded.provider,
         title = excluded.title,
@@ -264,6 +269,7 @@ function upsertKnowledgeDocument(document) {
         updated_at = CURRENT_TIMESTAMP
     `,
     [
+      document.ownerUserId || null,
       document.docType,
       document.provider,
       document.title,
@@ -274,6 +280,17 @@ function upsertKnowledgeDocument(document) {
       JSON.stringify(document.tags || []),
       JSON.stringify(document.metadata || {})
     ]
+  );
+}
+
+function deleteKnowledgeDocumentsByUserId(userId) {
+  return run("DELETE FROM knowledge_documents WHERE owner_user_id = ?", [userId]);
+}
+
+function getKnowledgeDocumentsByUserId(userId) {
+  return all(
+    "SELECT * FROM knowledge_documents WHERE owner_user_id = ? ORDER BY updated_at DESC, id DESC",
+    [userId]
   );
 }
 
@@ -348,6 +365,8 @@ module.exports = {
   saveRoadmap,
   getLatestRoadmapByUserId,
   upsertKnowledgeDocument,
+  deleteKnowledgeDocumentsByUserId,
+  getKnowledgeDocumentsByUserId,
   getKnowledgeDocumentsByType,
   getAllKnowledgeDocuments,
   createRememberToken,
