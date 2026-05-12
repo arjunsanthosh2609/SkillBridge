@@ -1057,13 +1057,23 @@ function buildFallbackExam(goal, skills) {
 }
 
 function buildFallbackRoadmap({ goal, skills, skillLevel, score }) {
+  const studyPlan = buildStudyTopicPlan({ goal, skills, skillLevel });
+  const firstTopics = studyPlan[0] || [];
+  const nextTopics = studyPlan[1] || [];
+  const highlightedTopics = [...firstTopics.slice(0, 3), ...nextTopics.slice(0, 2)]
+    .map((topic) => topic.topic)
+    .filter(Boolean);
+  const topicSentence = highlightedTopics.length
+    ? highlightedTopics.join(", ")
+    : `the core concepts expected for ${goal}`;
+
   return {
     headline: `${goal} growth roadmap for a ${skillLevel.toLowerCase()} learner`,
     summary: `Your resume shows ${skills.length ? skills.join(", ") : "emerging skills"}, and your assessment score is ${score}%. This roadmap prioritizes closing the highest-impact gaps first.`,
     answers: {
       whereAmINow: `You are currently at a ${skillLevel.toLowerCase()} level for ${goal}. Your current profile shows ${skills.length ? skills.join(", ") : "early-stage skills"}, and your assessment score is ${score}%.`,
       whatAmIMissing: `You are missing stronger proof of applied ability, deeper role-specific fundamentals, and clearer project evidence for ${goal}.`,
-      whatShouldILearnNext: `You should next learn the highest-impact missing concepts for ${goal}, then convert them into one or two practical projects.`,
+      whatShouldILearnNext: `You should next study ${topicSentence}. Focus on these topics first before moving to bigger projects.`,
       whyShouldILearnIt: `You should learn these areas because they close the gap between what your resume claims and what employers expect you to demonstrate in real work.`,
       howShouldILearnIt: "Learn through a mix of short focused study, hands-on exercises, one guided project, resume improvement, and mock interview practice.",
       whenAmIJobReady: "You are job-ready when you can explain your core skills confidently, complete a role-aligned project independently, show evidence in your resume, and answer common technical questions with real examples."
@@ -1073,6 +1083,7 @@ function buildFallbackRoadmap({ goal, skills, skillLevel, score }) {
         title: "Phase 1: Assess and strengthen foundations",
         duration: "Weeks 1-2",
         objective: `Build a reliable base in the core concepts expected from a ${goal}.`,
+        studyTopics: studyPlan[0],
         actions: [
           `Review the most important concepts required for ${goal} and compare them with your current resume skills.`,
           "Create a short list of weak topics based on your exam mistakes and resume gaps.",
@@ -1104,6 +1115,7 @@ function buildFallbackRoadmap({ goal, skills, skillLevel, score }) {
         title: "Phase 2: Build practical capability",
         duration: "Weeks 3-5",
         objective: "Turn weak or theoretical skills into hands-on experience through guided practice.",
+        studyTopics: studyPlan[1],
         actions: [
           "Study the missing concepts that most directly affect your target role.",
           "Build one focused project that combines your current strengths with one or two missing skills.",
@@ -1135,6 +1147,7 @@ function buildFallbackRoadmap({ goal, skills, skillLevel, score }) {
         title: "Phase 3: Strengthen profile and portfolio",
         duration: "Weeks 6-8",
         objective: "Improve how your work is presented so your profile clearly reflects real capability.",
+        studyTopics: studyPlan[2],
         actions: [
           "Refine your project descriptions using outcomes, responsibilities, and concrete tools.",
           "Update your resume with better evidence for skills, projects, and achievements.",
@@ -1166,6 +1179,7 @@ function buildFallbackRoadmap({ goal, skills, skillLevel, score }) {
         title: "Phase 4: Prepare for interviews and next steps",
         duration: "Weeks 9-10",
         objective: "Convert your improved skills and projects into interview readiness and a repeatable growth plan.",
+        studyTopics: studyPlan[3],
         actions: [
           "Practice technical questions tied to your goal and resume skills.",
           "Review common role-specific scenarios, tradeoffs, and debugging questions.",
@@ -1197,10 +1211,209 @@ function buildFallbackRoadmap({ goal, skills, skillLevel, score }) {
   };
 }
 
+const ROLE_TOPIC_LIBRARY = [
+  {
+    match: ["frontend"],
+    phases: [
+      ["HTML semantic structure", "CSS box model and specificity", "Flexbox and CSS Grid", "JavaScript ES6 syntax", "DOM events and form handling"],
+      ["Async JavaScript with fetch", "React components and props", "React state and hooks", "Client-side routing", "API integration and error handling"],
+      ["Performance optimization", "Responsive design", "Accessibility basics", "State management patterns", "Component reuse and folder structure"],
+      ["Frontend debugging", "Browser dev tools", "Testing UI flows", "Deploying a frontend app", "Explaining project architecture"]
+    ]
+  },
+  {
+    match: ["backend", "full stack"],
+    phases: [
+      ["HTTP methods and status codes", "REST API structure", "Node.js runtime basics", "Express routing and middleware", "Request validation"],
+      ["CRUD API design", "Authentication and authorization", "SQL joins and queries", "Database schema design", "Error handling and logging"],
+      ["API testing with Postman", "File uploads and parsing", "Caching and performance basics", "Security basics like hashing and input sanitization", "Connecting frontend and backend"],
+      ["System design basics", "Deployment flow", "Environment variables and configuration", "Debugging server issues", "Explaining backend project decisions"]
+    ]
+  },
+  {
+    match: ["data analyst"],
+    phases: [
+      ["Excel formulas and cleaning", "SQL SELECT, WHERE, GROUP BY", "JOIN operations", "Data cleaning basics", "Descriptive statistics"],
+      ["Power BI or dashboard basics", "Data visualization principles", "Trend and variance analysis", "KPIs and business metrics", "Storytelling with data"],
+      ["Advanced SQL aggregations", "Case statements", "Working with messy datasets", "Building end-to-end dashboards", "Insight writing"],
+      ["Case study presentation", "Explaining dashboards clearly", "Interview SQL practice", "Choosing the right chart", "Business problem framing"]
+    ]
+  },
+  {
+    match: ["data scientist", "machine learning"],
+    phases: [
+      ["Python for data work", "NumPy and pandas basics", "Data cleaning", "Exploratory data analysis", "Statistics and probability basics"],
+      ["Feature engineering", "Train-test split", "Regression and classification basics", "Model evaluation metrics", "Overfitting and regularization"],
+      ["Scikit-learn pipelines", "Hyperparameter tuning", "Model comparison", "NLP or deep learning basics if relevant", "Project documentation"],
+      ["Explaining model decisions", "End-to-end ML project workflow", "Interview ML questions", "Deployment basics", "Tradeoffs between models"]
+    ]
+  },
+  {
+    match: ["cloud"],
+    phases: [
+      ["Linux command line", "Networking basics", "Cloud service categories", "Virtual machines and storage", "IAM and least privilege"],
+      ["Containers and Docker", "CI/CD basics", "Infrastructure as code", "Monitoring and logging", "Load balancing basics"],
+      ["AWS deployment workflow", "Scaling and availability", "Kubernetes basics", "Cost awareness", "Secure configuration"],
+      ["Cloud troubleshooting", "Architecture explanation", "Disaster recovery basics", "Interview scenarios", "Production best practices"]
+    ]
+  },
+  {
+    match: ["security", "cybersecurity"],
+    phases: [
+      ["Networking basics", "Common vulnerabilities", "Authentication and authorization", "Input sanitization", "Security principles"],
+      ["OWASP concepts", "Log analysis", "Secure coding basics", "Threat modeling", "Incident response basics"],
+      ["Vulnerability assessment workflow", "Cloud security basics", "Identity and access control", "Practical labs", "Security reporting"],
+      ["Interview threat scenarios", "Security project explanation", "Defense-in-depth", "Security monitoring", "Risk prioritization"]
+    ]
+  },
+  {
+    match: ["ui/ux", "design"],
+    phases: [
+      ["Design principles", "Typography hierarchy", "Color and contrast", "Wireframing basics", "User flow mapping"],
+      ["Figma components", "Design systems", "Responsive layouts", "Accessibility in interfaces", "Prototype creation"],
+      ["Usability testing", "Design critique", "Portfolio case study writing", "Interaction design basics", "Problem framing"],
+      ["Presenting design decisions", "Interview portfolio walkthrough", "Design tradeoffs", "Collaboration with developers", "Iteration based on feedback"]
+    ]
+  }
+];
+
+const SKILL_TOPIC_LIBRARY = {
+  javascript: ["JavaScript variables and scope", "Array methods", "Promises and async/await", "Error handling", "DOM manipulation"],
+  typescript: ["Type annotations", "Interfaces and types", "Generics basics", "Type-safe API responses"],
+  react: ["JSX and components", "Props vs state", "useEffect and lifecycle thinking", "Form handling in React"],
+  node: ["Event loop basics", "Modules and package structure", "Async I/O", "Building APIs with Node"],
+  express: ["Routing", "Middleware chain", "Request validation", "Error middleware"],
+  sql: ["SELECT and filtering", "JOINs", "GROUP BY and HAVING", "Subqueries"],
+  python: ["Functions and modules", "Lists and dictionaries", "File handling", "Working with libraries"],
+  java: ["OOP basics", "Classes and objects", "Collections", "Exception handling"],
+  aws: ["EC2 and S3 basics", "IAM", "Cloud deployment basics", "Monitoring services"],
+  docker: ["Images vs containers", "Dockerfile basics", "Volume and port mapping", "Container debugging"],
+  kubernetes: ["Pods and deployments", "Services", "ConfigMaps and secrets", "Scaling basics"],
+  git: ["Commit flow", "Branches and merges", "Resolving conflicts", "Pull request basics"],
+  figma: ["Components", "Auto layout", "Prototype links", "Design handoff"],
+  powerbi: ["Data model relationships", "Measures and DAX basics", "Dashboard filters", "Report storytelling"],
+  ml: ["Feature engineering", "Model evaluation", "Bias-variance tradeoff", "Pipeline thinking"],
+  nlp: ["Tokenization", "Text cleaning", "Vectorization basics", "Text classification flow"]
+};
+
+function describeStudyTopic(topic) {
+  const detailsByTopic = {
+    "HTML semantic structure": "Study semantic tags, accessible page structure, headings, forms, and how to organize content correctly.",
+    "CSS box model and specificity": "Study margin, padding, border, width calculation, selector priority, and how style conflicts are resolved.",
+    "Flexbox and CSS Grid": "Study row and column layouts, alignment, spacing, responsive positioning, and when to use each layout system.",
+    "JavaScript ES6 syntax": "Study variables, arrow functions, template literals, destructuring, spread operators, and modules.",
+    "DOM events and form handling": "Study event listeners, input handling, validation, event bubbling, and updating UI from user actions.",
+    "Async JavaScript with fetch": "Study promises, async/await, API requests, loading states, and handling request failures.",
+    "React components and props": "Study how to split UI into components, pass data with props, and keep components reusable.",
+    "React state and hooks": "Study useState, useEffect, state updates, side effects, and how component data changes over time.",
+    "Client-side routing": "Study page navigation, route parameters, protected routes, and organizing multi-page frontend flows.",
+    "API integration and error handling": "Study how to call APIs, handle loading and error states, and map responses into the interface.",
+    "HTTP methods and status codes": "Study GET, POST, PUT, DELETE, request-response flow, and the meaning of common status codes.",
+    "REST API structure": "Study resource-based routing, endpoint naming, request payloads, and predictable response shapes.",
+    "Node.js runtime basics": "Study modules, asynchronous execution, package structure, and how Node handles server-side code.",
+    "Express routing and middleware": "Study route handlers, middleware flow, request processing, and reusable backend logic.",
+    "Request validation": "Study checking request data, required fields, invalid input handling, and preventing bad data from entering the system.",
+    "CRUD API design": "Study create, read, update, delete operations and how they map to routes and database changes.",
+    "Authentication and authorization": "Study login flow, session or token handling, password protection, and access control decisions.",
+    "SQL joins and queries": "Study SELECT, WHERE, JOIN, GROUP BY, sorting, and combining related tables correctly.",
+    "Database schema design": "Study tables, columns, relationships, keys, normalization, and how data should be stored.",
+    "Error handling and logging": "Study try/catch flow, consistent error responses, server logging, and debugging backend issues.",
+    "Python for data work": "Study Python syntax, functions, lists, dictionaries, and writing clean data-processing code.",
+    "NumPy and pandas basics": "Study arrays, dataframes, filtering, grouping, and basic transformations on structured data.",
+    "Data cleaning": "Study missing values, duplicates, type conversion, outliers, and making raw data usable.",
+    "Exploratory data analysis": "Study distributions, correlations, summary statistics, and how to inspect data before modeling.",
+    "Statistics and probability basics": "Study averages, variance, probability, distributions, and hypothesis thinking.",
+    "Feature engineering": "Study how to create useful input variables from raw data so models can learn better patterns.",
+    "Train-test split": "Study how to separate training and evaluation data and why model testing must use unseen data.",
+    "Regression and classification basics": "Study supervised learning problem types, common algorithms, and when to use each one.",
+    "Model evaluation metrics": "Study accuracy, precision, recall, F1 score, RMSE, and choosing the right metric.",
+    "Overfitting and regularization": "Study why models memorize training data, how to detect it, and how to reduce it.",
+    "Linux command line": "Study file navigation, permissions, common shell commands, and basic system operations.",
+    "Networking basics": "Study IPs, ports, DNS, HTTP/HTTPS, and how systems communicate over networks.",
+    "Cloud service categories": "Study compute, storage, networking, database, and identity services in cloud platforms.",
+    "Virtual machines and storage": "Study instance setup, disks, object storage, and where application data lives.",
+    "IAM and least privilege": "Study user roles, permissions, access policies, and giving only the access that is needed.",
+    "Containers and Docker": "Study images, containers, Dockerfiles, environment setup, and packaging apps consistently.",
+    "CI/CD basics": "Study automated build, test, and deployment pipelines and how code moves to production.",
+    "Infrastructure as code": "Study defining infrastructure in code, repeatable deployments, and configuration management.",
+    "Monitoring and logging": "Study health checks, logs, metrics, alerts, and how to observe application behavior.",
+    "Load balancing basics": "Study traffic distribution, scaling, availability, and handling multiple service instances.",
+    "Design principles": "Study alignment, contrast, hierarchy, spacing, consistency, and how they improve usability.",
+    "Typography hierarchy": "Study heading structure, readable text scales, font pairing, and scannable layout.",
+    "Color and contrast": "Study accessible contrast, color meaning, emphasis, and using color intentionally in interfaces.",
+    "Wireframing basics": "Study low-fidelity screens, layout planning, user task flow, and quick interface exploration.",
+    "User flow mapping": "Study how users move through a product, decision points, and reducing friction in tasks."
+  };
+
+  return detailsByTopic[topic] || `Study the core ideas, practical usage, common mistakes, and how ${topic.toLowerCase()} is applied in real projects.`;
+}
+
+function buildStudyTopicPlan({ goal, skills, skillLevel }) {
+  const goalText = String(goal || "").toLowerCase();
+  const matchedRole = ROLE_TOPIC_LIBRARY.find((entry) => entry.match.some((keyword) => goalText.includes(keyword)));
+  const basePlan = matchedRole ? matchedRole.phases.map((phase) => [...phase]) : [
+    ["Role fundamentals", "Core tools used in the role", "Problem-solving basics", "Debugging workflow", "Basic project structure"],
+    ["Applied practice on weak skills", "One role-aligned workflow", "Tool usage in real tasks", "Testing your understanding", "Project planning basics"],
+    ["Portfolio-quality implementation", "Resume evidence building", "Project documentation", "Communication of work", "Refining weak areas"],
+    ["Interview preparation", "Project explanation", "Advanced next topics", "Real-world scenarios", "Continued learning plan"]
+  ];
+
+  const normalizedSkills = normalizeSkills(skills);
+  const skillTopics = normalizedSkills
+    .flatMap((skill) => SKILL_TOPIC_LIBRARY[String(skill).toLowerCase()] || [])
+    .filter(Boolean);
+
+  if (skillTopics.length) {
+    skillTopics.forEach((topic, index) => {
+      const phaseIndex = Math.min(index % 2, basePlan.length - 1);
+      if (!basePlan[phaseIndex].includes(topic)) {
+        basePlan[phaseIndex].push(topic);
+      }
+    });
+  }
+
+  if (String(skillLevel || "").toLowerCase() === "advanced") {
+    if (!basePlan[2].includes("Architecture tradeoffs")) {
+      basePlan[2].push("Architecture tradeoffs");
+    }
+    if (!basePlan[3].includes("Advanced interview scenarios")) {
+      basePlan[3].push("Advanced interview scenarios");
+    }
+  }
+
+  return basePlan.map((phase) =>
+    Array.from(new Set(phase)).slice(0, 6).map((topic) => ({
+      topic,
+      details: describeStudyTopic(topic)
+    }))
+  );
+}
+
 function normalizeRoadmapPhase(phase, index) {
   const actions = Array.isArray(phase.actions) ? phase.actions.filter(Boolean) : [];
   const steps = Array.isArray(phase.steps) ? phase.steps.filter(Boolean) : actions.map((action, actionIndex) => `Step ${actionIndex + 1}: ${action}`);
   const deliverables = Array.isArray(phase.deliverables) ? phase.deliverables.filter(Boolean) : [];
+  const studyTopics = Array.isArray(phase.studyTopics)
+    ? phase.studyTopics
+        .map((topic) => {
+          if (!topic) return null;
+          if (typeof topic === "string") {
+            return {
+              topic,
+              details: describeStudyTopic(topic)
+            };
+          }
+
+          const topicName = String(topic.topic || topic.name || "").trim();
+          if (!topicName) return null;
+
+          return {
+            topic: topicName,
+            details: String(topic.details || topic.description || describeStudyTopic(topicName)).trim()
+          };
+        })
+        .filter(Boolean)
+    : [];
   const practiceAssignments = Array.isArray(phase.practiceAssignments) ? phase.practiceAssignments.filter(Boolean) : [];
   const projectRecommendations = Array.isArray(phase.projectRecommendations) ? phase.projectRecommendations.filter(Boolean) : [];
 
@@ -1211,6 +1424,7 @@ function normalizeRoadmapPhase(phase, index) {
     actions,
     steps,
     deliverables,
+    studyTopics,
     practiceAssignments,
     projectRecommendations,
     resources: Array.isArray(phase.resources) ? phase.resources : []
@@ -1230,6 +1444,20 @@ function normalizeRoadmapShape(roadmap) {
       whenAmIJobReady: String(roadmap.answers?.whenAmIJobReady || "").trim()
     },
     phases: Array.isArray(roadmap.phases) ? roadmap.phases.map(normalizeRoadmapPhase) : []
+  };
+}
+
+function ensureRoadmapStudyTopics(roadmap, { goal, skills, skillLevel }) {
+  const fallbackStudyPlan = buildStudyTopicPlan({ goal, skills, skillLevel });
+
+  return {
+    ...roadmap,
+    phases: roadmap.phases.map((phase, index) => ({
+      ...phase,
+      studyTopics: phase.studyTopics && phase.studyTopics.length
+        ? phase.studyTopics
+        : (fallbackStudyPlan[index] || [])
+    }))
   };
 }
 
@@ -1313,6 +1541,10 @@ Each phase object must contain:
 - "title"
 - "duration"
 - "objective"
+- "studyTopics" array with 4 to 6 objects
+  - each object must contain:
+    - "topic"
+    - "details"
 - "actions" array with 3 strings
 - "steps" array with 4 to 6 strings written as a clear step-by-step plan
 - "deliverables" array with 2 to 4 strings
@@ -1331,7 +1563,10 @@ Rules:
 - Make the roadmap detailed, clear, and practical.
 - The "answers" object must directly answer the user's current position, gaps, next learning priorities, rationale, learning method, and estimated job-readiness state.
 - Each phase should feel sequential and build on the previous phase.
+- The "studyTopics" must name exact concepts, tools, frameworks, workflows, or problem areas to study. Do not say vague phrases like "learn fundamentals" or "improve basics" without naming what those basics are.
+- The "details" field must define what the user should cover inside that topic in one practical sentence.
 - The "steps" should be concrete actions, not vague advice.
+- The "whatShouldILearnNext" answer must explicitly list the most important topics to study next.
 - The "practiceAssignments" should feel like tasks the user can complete this week.
 - The "projectRecommendations" should be role-aligned and realistic for the user's level.
 - Use the user's existing skills, projects, education, certifications, courses, and achievements when shaping the plan.
@@ -1341,7 +1576,11 @@ Rules:
     ttlMs: 1000 * 60 * 15,
     forceRefresh
   });
-  const normalizedRoadmap = normalizeRoadmapShape(roadmap);
+  const normalizedRoadmap = ensureRoadmapStudyTopics(normalizeRoadmapShape(roadmap), {
+    goal,
+    skills: normalizedSkills,
+    skillLevel
+  });
   const enrichedRoadmap = await attachStudyMaterials(normalizedRoadmap, goal, normalizedSkills, skillLevel, score, fallbackContext);
   return {
     ...enrichedRoadmap,

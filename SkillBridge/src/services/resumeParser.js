@@ -3,6 +3,7 @@ const path = require("path");
 const pdfParse = require("pdf-parse");
 const mammoth = require("mammoth");
 const natural = require("natural");
+const Tesseract = require("tesseract.js");
 
 const tokenizer = new natural.WordTokenizer();
 
@@ -66,6 +67,13 @@ async function readResumeText(filePath, originalName) {
   if (ext === ".docx") {
     const result = await mammoth.extractRawText({ path: filePath });
     return result.value;
+  }
+
+  if ([".png", ".jpg", ".jpeg", ".webp", ".bmp"].includes(ext)) {
+    const {
+      data: { text }
+    } = await Tesseract.recognize(filePath, "eng");
+    return text;
   }
 
   return fs.readFile(filePath, "utf8");
