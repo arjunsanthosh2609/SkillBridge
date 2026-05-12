@@ -195,11 +195,15 @@ app.get("/signup", (req, res) => res.render("signup", { goals: GOALS, error: nul
 
 app.get("/login", (_req, res) => res.render("login", { error: null, formData: {} }));
 
-app.post("/signup", upload.single("resume"), async (req, res) => {
+app.post("/signup", upload.fields([
+  { name: "resume", maxCount: 1 },
+  { name: "resumeCamera", maxCount: 1 }
+]), async (req, res) => {
     const formData = { ...req.body };
     try {
         const mobileSkillsRaw = req.body.mobileScannedSkills || "";
-        if (!req.file && !mobileSkillsRaw) throw new Error("Please upload a resume or use mobile scan.");
+        const uploadedResume = req.files?.resume?.[0] || req.files?.resumeCamera?.[0] || null;
+        if (!uploadedResume && !mobileSkillsRaw) throw new Error("Please upload a resume or capture one with the camera.");
         
         if (req.body.password !== req.body.confirmPassword) throw new Error("Passwords do not match.");
 
@@ -207,8 +211,8 @@ app.post("/signup", upload.single("resume"), async (req, res) => {
         let extractedText = "";
         let parsedResumeData = null;
 
-        if (req.file) {
-            const data = await extractResumeData(req.file.path, req.file.originalname);
+        if (uploadedResume) {
+            const data = await extractResumeData(uploadedResume.path, uploadedResume.originalname);
             finalSkills = normalizeResumeSkills(data.skills);
             extractedText = data.resumeText || data.text || "File upload content";
             parsedResumeData = data;
@@ -226,7 +230,7 @@ app.post("/signup", upload.single("resume"), async (req, res) => {
         const newUser = await createUser({
             ...formData,
             passwordHash: await bcrypt.hash(req.body.password, 10),
-            resumeFilename: req.file ? req.file.filename : "mobile-scan.png",
+            resumeFilename: uploadedResume ? uploadedResume.filename : "mobile-scan.png",
             resumeText: extractedText || "No text available",
             resumeSkills: JSON.stringify(finalSkills)
         });
@@ -482,6 +486,7 @@ app.get("/roadmap", requireAuth, async (req, res) => {
     summary: roadmap.summary,
     phasesJson: JSON.stringify(roadmap.phases || []),
     contextJson: JSON.stringify({
+      answers: roadmap.answers || {},
       datasetSuggestions: roadmap.datasetSuggestions || [],
       knowledgeBase: roadmap.knowledgeBase || {}
     })
@@ -514,6 +519,7 @@ app.get("/roadmap/progress", requireAuth, async (req, res) => {
       headline: latestRoadmap.headline,
       summary: latestRoadmap.summary,
       phases: JSON.parse(latestRoadmap.phases_json || "[]"),
+      answers: JSON.parse(latestRoadmap.context_json || "{}").answers || {},
       ...(JSON.parse(latestRoadmap.context_json || "{}"))
     },
     isSavedRoadmap: true

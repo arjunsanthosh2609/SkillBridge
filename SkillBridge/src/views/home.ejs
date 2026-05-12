@@ -57,8 +57,8 @@
       <% if (examResult) { %>
         <% if (hasRoadmap) { %>
           <div class="action-row">
-            <a class="primary-btn" href="/roadmap" style="height: 58px;">Regenerate roadmap</a>
-            <a class="ghost-btn" href="/roadmap/progress" style="min-width: 220px;justify-content: center;height: 60px;">Track progress</a>
+            <a class="primary-btn" href="/roadmap?refresh=1" style="height: 58px;">Regenerate roadmap</a>
+            <a class="ghost-btn" href="/roadmap/progress" style="min-width: 220px;justify-content: center;height: 60px;">Current Roadmap</a>
           </div>
         <% } else { %>
           <a class="primary-btn" href="/roadmap">Generate roadmap</a>

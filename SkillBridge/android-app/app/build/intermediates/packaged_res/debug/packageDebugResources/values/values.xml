@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:ns1="http://schemas.android.com/tools">
+    <color name="black">#FF000000</color>
+    <color name="skillbridge_accent">#EF8354</color>
+    <color name="skillbridge_primary">#0C7C59</color>
+    <color name="skillbridge_primary_dark">#085B42</color>
+    <color name="white">#FFFFFFFF</color>
+    <string name="app_name">SkillBridge</string>
+    <string name="skillbridge_base_url">http://10.112.80.138:3000</string>
+    <style name="Theme.SkillBridgeAndroid" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/skillbridge_primary</item>
+        <item name="colorPrimaryContainer">@color/skillbridge_primary_dark</item>
+        <item name="colorSecondary">@color/skillbridge_accent</item>
+        <item name="android:statusBarColor">@color/skillbridge_primary_dark</item>
+        <item name="android:navigationBarColor">@color/white</item>
+        <item name="android:windowLightStatusBar" ns1:targetApi="m">false</item>
+    </style>
+</resources>

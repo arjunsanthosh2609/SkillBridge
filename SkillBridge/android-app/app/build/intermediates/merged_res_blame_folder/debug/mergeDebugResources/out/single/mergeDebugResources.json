@@ -1,0 +1,26 @@
+[
+    {
+        "merged": "C:\\Users\\arjun\\.gradle\\daemon\\8.4\\com.skillbridge.app-debug-36:\\xml_network_security_config.xml.flat",
+        "source": "C:\\Users\\arjun\\.gradle\\daemon\\8.4\\com.skillbridge.app-main-38:\\xml\\network_security_config.xml"
+    },
+    {
+        "merged": "C:\\Users\\arjun\\.gradle\\daemon\\8.4\\com.skillbridge.app-debug-36:\\drawable_ic_launcher_foreground.xml.flat",
+        "source": "C:\\Users\\arjun\\.gradle\\daemon\\8.4\\com.skillbridge.app-main-38:\\drawable\\ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "C:\\Users\\arjun\\.gradle\\daemon\\8.4\\com.skillbridge.app-debug-36:\\mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "C:\\Users\\arjun\\.gradle\\daemon\\8.4\\com.skillbridge.app-main-38:\\mipmap-anydpi-v26\\ic_launcher_round.xml"
+    },
+    {
+        "merged": "C:\\Users\\arjun\\.gradle\\daemon\\8.4\\com.skillbridge.app-debug-36:\\mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "C:\\Users\\arjun\\.gradle\\daemon\\8.4\\com.skillbridge.app-main-38:\\mipmap-anydpi-v26\\ic_launcher.xml"
+    },
+    {
+        "merged": "com.skillbridge.app-debug-36:/xml_file_paths.xml.flat",
+        "source": "com.skillbridge.app-main-38:/xml/file_paths.xml"
+    },
+    {
+        "merged": "C:\\Users\\arjun\\.gradle\\daemon\\8.4\\com.skillbridge.app-debug-36:\\layout_activity_main.xml.flat",
+        "source": "C:\\Users\\arjun\\.gradle\\daemon\\8.4\\com.skillbridge.app-main-38:\\layout\\activity_main.xml"
+    }
+]
